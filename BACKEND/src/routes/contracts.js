@@ -16,7 +16,7 @@ const CONTRATO_DE_MI_EMPRESA =
   "EXISTS (SELECT 1 FROM clientes cl WHERE cl.id = contratos.cliente_id AND cl.empresa_id = $EMP)";
 
 async function clienteDeMiEmpresa(clienteId, empresaId) {
-  const r = await pool.query("SELECT 1 FROM clientes WHERE id = $1 AND empresa_id = $2", [Number(clienteId), empresaId]);
+  const r = await pool.query("SELECT 1 FROM clientes WHERE id = $1 AND empresa_id = $2 AND eliminado_en IS NULL", [Number(clienteId), empresaId]);
   return r.rows.length > 0;
 }
 
@@ -167,7 +167,7 @@ router.get("/dashboard", async (req, res, next) => {
 
     // Total de clientes asociados a la empresa
     const totalClientesResult = await pool.query(
-      "SELECT COUNT(*) as total FROM clientes WHERE empresa_id = $1",
+      "SELECT COUNT(*) as total FROM clientes WHERE empresa_id = $1 AND eliminado_en IS NULL",
       [empresaId]
     );
     const totalClientes = parseInt(totalClientesResult.rows[0].total);

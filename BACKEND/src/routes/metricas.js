@@ -106,7 +106,7 @@ router.get("/", async (req, res, next) => {
 
     // Total de clientes de la empresa
     const totalClientesResult = await pool.query(
-      "SELECT COUNT(*) as total FROM clientes WHERE empresa_id = $1",
+      "SELECT COUNT(*) as total FROM clientes WHERE empresa_id = $1 AND eliminado_en IS NULL",
       [empresaId]
     );
     const totalClientes = parseInt(totalClientesResult.rows[0].total);
