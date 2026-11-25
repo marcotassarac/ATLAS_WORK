@@ -1,5 +1,6 @@
 const express = require("express");
 const { pool } = require("../db");
+const { validarCliente, validarContrato, validarEmpresa, validarUsuarioNuevo, Validador, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
 
 const router = express.Router();
@@ -48,7 +49,10 @@ router.get("/:id", async (req, res) => {
 
 // Actualizar empresa
 router.put("/:id", soloAdministrador, async (req, res) => {
-  const { nombre, direccion = null, telefono = null, correo } = req.body;
+  // DEF-09: validación de los datos de la empresa
+  const { datos, errores } = validarEmpresa(req.body);
+  if (hayErrores(errores)) return responderErrores(res, errores);
+  const { nombre, direccion, telefono, correo } = datos;
   try {
     const result = await pool.query(
       "UPDATE empresas SET nombre=$1, direccion=$2, telefono=$3, correo=$4 WHERE id=$5 AND id=$6 RETURNING *",

@@ -1,5 +1,6 @@
 const express = require("express");
 const { pool } = require("../db");
+const { validarCliente, validarContrato, validarEmpresa, validarUsuarioNuevo, Validador, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
 
 const router = express.Router();
@@ -7,6 +8,9 @@ const router = express.Router();
 
 // Crear cliente (empresa)
 router.post("/", soloAdministrador, async (req, res) => {
+  // DEF-09: validación y normalización de todos los campos (RF-4.3)
+  const { datos, errores } = validarCliente(req.body);
+  if (hayErrores(errores)) return responderErrores(res, errores);
   const {
     nombre,
     correo,
@@ -37,7 +41,7 @@ router.post("/", soloAdministrador, async (req, res) => {
     metodo_pago = null,
     dia_pago = null,
     moneda = null,
-  } = req.body;
+  } = datos;
 
   try {
     // Obtener empresa_id del token
@@ -170,6 +174,9 @@ router.get("/:id", async (req, res) => {
 
 // Editar cliente (validando que pertenezca a la empresa del token)
 router.put("/:id", soloAdministrador, async (req, res) => {
+  // DEF-09: validación y normalización de todos los campos (RF-4.3)
+  const { datos, errores } = validarCliente(req.body);
+  if (hayErrores(errores)) return responderErrores(res, errores);
   const {
     nombre,
     correo,
@@ -200,7 +207,7 @@ router.put("/:id", soloAdministrador, async (req, res) => {
     metodo_pago = null,
     dia_pago = null,
     moneda = null,
-  } = req.body;
+  } = datos;
 
   try {
     const authUser = req.usuario;

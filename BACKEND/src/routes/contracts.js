@@ -3,6 +3,7 @@ const fs = require("fs");
 const express = require("express");
 const multer = require("multer");
 const { pool } = require("../db");
+const { validarCliente, validarContrato, validarEmpresa, validarUsuarioNuevo, Validador, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
 
 const router = express.Router();
@@ -23,13 +24,10 @@ async function clienteDeMiEmpresa(clienteId, empresaId) {
 
 // Crear contrato con archivo PDF (guardado en DB como bytea)
 router.post("/", soloAdministrador, upload.single("file"), async (req, res) => {
-  const {
-    cliente_id,
-    titulo,
-    descripcion = null,
-    fecha_inicio,
-    fecha_fin,
-  } = req.body;
+  // DEF-09: validación de cliente, título, descripción y fechas
+  const { datos, errores } = validarContrato(req.body);
+  if (hayErrores(errores)) return responderErrores(res, errores);
+  const { cliente_id, titulo, descripcion, fecha_inicio, fecha_fin } = datos;
   try {
     // DEF-06 / RB-3: el cliente del contrato debe ser de la empresa de la sesión
     if (!(await clienteDeMiEmpresa(cliente_id, req.usuario.empresaId))) {
@@ -290,8 +288,10 @@ router.put("/:id", soloAdministrador, upload.single("file"), async (req, res) =>
       });
     }
 
-    const { cliente_id, titulo, descripcion, fecha_inicio, fecha_fin } =
-      req.body;
+    // DEF-09: validación parcial (solo los campos enviados)
+    const { datos, errores } = validarContrato(req.body, { parcial: true });
+    if (hayErrores(errores)) return responderErrores(res, errores);
+    const { cliente_id, titulo, descripcion, fecha_inicio, fecha_fin } = datos;
 
     // Construir la consulta dinámicamente solo con los campos que se envían
     const updates = [];

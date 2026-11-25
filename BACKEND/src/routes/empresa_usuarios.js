@@ -1,5 +1,6 @@
 const express = require("express");
 const { pool } = require("../db");
+const { validarCliente, validarContrato, validarEmpresa, validarUsuarioNuevo, Validador, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
 const { erroresPolitica, mensajePolitica, hashear } = require("../seguridad/contrasenas");
 
@@ -29,6 +30,9 @@ router.post("/", soloAdministrador, async (req, res) => {
     if (usuario_id) {
       return res.status(400).json({ error: "Datos inválidos", glosa: "Solo se pueden crear usuarios nuevos para la empresa." });
     } else if (nombre_usuario && contrasena_hash && correo) {
+      // DEF-09: formato del nombre de usuario y del correo
+      const vu = validarUsuarioNuevo(req.body);
+      if (hayErrores(vu.errores)) return responderErrores(res, vu.errores);
       // Crear usuario primero (DEF-03: política de contraseñas y hash bcrypt)
       const erroresClave = erroresPolitica(contrasena_hash);
       if (erroresClave.length) {

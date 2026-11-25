@@ -3,17 +3,25 @@
 // todo lo demás exige autenticación.
 const express = require("express");
 const { pool } = require("../db");
+const { validarCliente, validarContrato, validarEmpresa, validarUsuarioNuevo, Validador, hayErrores, responderErrores } = require("../validacion");
 const { erroresPolitica, mensajePolitica, hashear } = require("../seguridad/contrasenas");
 
 const router = express.Router();
+
+const prefijar = (p, e) => Object.fromEntries(Object.entries(e).map(([k, v]) => [p + k, v]));
 
 router.post("/", async (req, res) => {
   if (!req.body || !req.body.usuario || !req.body.empresa) {
     return res.status(400).json({ error: "Datos inválidos", glosa: "Debe enviar los datos del usuario y de la empresa." });
   }
-  const { usuario, empresa } = req.body;
-  const { nombre_usuario, contrasena_hash, correo: correoUsuario } = usuario;
-  const { nombre, direccion = null, telefono = null, correo } = empresa;
+  // DEF-09: validación de los datos del usuario y de la empresa
+  const vu = validarUsuarioNuevo(req.body.usuario);
+  const ve = validarEmpresa(req.body.empresa);
+  const errores = { ...prefijar("usuario.", vu.errores), ...prefijar("empresa.", ve.errores) };
+  if (hayErrores(errores)) return responderErrores(res, errores);
+  const { nombre_usuario, correo: correoUsuario } = vu.datos;
+  const { contrasena_hash } = req.body.usuario;
+  const { nombre, direccion, telefono, correo } = ve.datos;
 
   try {
     const erroresClave = erroresPolitica(contrasena_hash);

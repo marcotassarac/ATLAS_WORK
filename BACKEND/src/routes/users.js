@@ -1,5 +1,6 @@
 const express = require("express");
 const { pool } = require("../db");
+const { validarCliente, validarContrato, validarEmpresa, validarUsuarioNuevo, Validador, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
 const { erroresPolitica, mensajePolitica, hashear } = require("../seguridad/contrasenas");
 
@@ -58,6 +59,11 @@ router.get("/:id", async (req, res) => {
 // Actualizar usuario
 router.put("/:id", soloAdministrador, async (req, res) => {
   const { nombre_usuario, contrasena_hash, correo } = req.body;
+  // DEF-09: si se envían, el nombre de usuario y el correo deben tener formato válido
+  const v = new Validador(req.body);
+  if (nombre_usuario !== undefined) v.usuario("nombre_usuario");
+  if (correo !== undefined) v.correo("correo", { requerido: true });
+  if (hayErrores(v.errores)) return responderErrores(res, v.errores);
   try {
     const erroresClave = contrasena_hash === undefined ? [] : erroresPolitica(contrasena_hash);
     if (erroresClave.length) {
