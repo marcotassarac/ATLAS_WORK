@@ -1,4 +1,4 @@
-import { Navigate, useLocation } from 'react-router-dom'
+import { Navigate, useLocation, useParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
 export function RequireAuth({ children }) {
@@ -15,3 +15,12 @@ export function RequireAdmin({ children }) {
 }
 
 
+
+// DEF-15: el administrador edita a cualquier usuario de su empresa; cada usuario puede
+// editar su propia cuenta (correo y contraseña). El servidor aplica la misma regla.
+export function RequireAdminOPropio({ children }) {
+  const { role, user } = useAuth()
+  const { id } = useParams()
+  if (role === 'administrador' || String(user?.usuarioId) === String(id)) return children
+  return <div>No autorizado.</div>
+}

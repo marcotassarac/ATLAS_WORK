@@ -15,6 +15,7 @@ const rolesRoutes = require("./routes/roles");
 const empresaUsuariosRoutes = require("./routes/empresa_usuarios");
 const metricasRoutes = require("./routes/metricas");
 const registroRoutes = require("./routes/registro");
+const compartidoRoutes = require("./routes/compartido");
 const { autenticar } = require("./middleware/autenticacion");
 const { limiteRegistro } = require("./middleware/limites");
 const { manejadorErrores, rutaNoEncontrada } = require("./errores");
@@ -28,6 +29,8 @@ app.use(morgan("dev"));
 // Rutas públicas: inicio de sesión, registro y estado del servicio.
 app.use("/autenticacion", authRoutes);
 app.use("/registro", limiteRegistro, registroRoutes);
+// DEF-15 (RF-5.5): descarga con enlace firmado y de vigencia limitada (sin sesión)
+app.use("/contratos/compartido", compartidoRoutes);
 app.get("/", (req, res) => {
   res.json({ name: "Atlas", status: "ok" });
 });

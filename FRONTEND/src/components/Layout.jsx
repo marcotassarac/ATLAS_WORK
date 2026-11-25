@@ -42,7 +42,8 @@ export default function Layout() {
   ];
 
   const handleEditAccount = () => {
-    navigate(`/usuarios/${user?.id || 1}/editar`);
+    // DEF-15: antes abría siempre al usuario 1 (user.id no existe en el token)
+    navigate(`/usuarios/${user?.usuarioId}/editar`);
   };
 
   const handleLogout = () => {

@@ -6,6 +6,13 @@ const { subirDocumento } = require("../archivos");
 const { validarId } = require("../errores");
 const { validarContrato, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
+const { crearEnlace } = require("../enlaces");
+
+// DEF-15 (RF-5.4): estado calculado según la fecha de término. "vence" cuando faltan
+// 30 días o menos (valor propuesto en el ERS).
+const ESTADO = `CASE WHEN c.fecha_fin < current_date THEN 'expirado'
+                    WHEN c.fecha_fin <= current_date + 30 THEN 'vence'
+                    ELSE 'activo' END AS estado`;
 
 const router = express.Router();
 router.param("id", validarId); // DEF-10: id numérico o 400
@@ -68,7 +75,8 @@ router.get("/", async (req, res, next) => {
         c.fecha_inicio, 
         c.fecha_fin, 
         c.created_at,
-        cl.nombre AS cliente_nombre
+        cl.nombre AS cliente_nombre,
+        ${ESTADO}
       FROM contratos c
       INNER JOIN clientes cl ON cl.id = c.cliente_id
       WHERE cl.empresa_id = $1
@@ -224,8 +232,10 @@ router.get("/dashboard", async (req, res, next) => {
 router.get("/:id", async (req, res, next) => {
   try {
     const result = await pool.query(
-      `SELECT id, cliente_id, titulo, descripcion, fecha_inicio, fecha_fin, created_at FROM contratos
-        WHERE id=$1 AND ${CONTRATO_DE_MI_EMPRESA.replace("$EMP", "$2")}`,
+      `SELECT c.id, c.cliente_id, c.titulo, c.descripcion, c.fecha_inicio, c.fecha_fin, c.created_at, ${ESTADO},
+              EXISTS (SELECT 1 FROM documentos_contrato d WHERE d.contract_id = c.id) AS tiene_documento
+         FROM contratos c
+        WHERE c.id=$1 AND ${CONTRATO_DE_MI_EMPRESA.replace("contratos.", "c.").replace("$EMP", "$2")}`,
       [req.params.id, req.usuario.empresaId]
     );
     if (result.rows.length === 0)
@@ -384,6 +394,29 @@ router.delete("/:id", soloAdministrador, async (req, res, next) => {
     });
 
     res.json({ deleted: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Enlace para compartir el documento de un contrato (RF-5.5).
+// DEF-15: el administrador genera un enlace de vigencia limitada (por defecto 60
+// minutos, máximo 24 horas) que permite descargar solo ese documento sin iniciar sesión.
+router.post("/:id/enlace", soloAdministrador, async (req, res, next) => {
+  try {
+    const minutos = req.body?.minutos === undefined ? 60 : Number(req.body.minutos);
+    if (!Number.isInteger(minutos) || minutos < 1 || minutos > 1440) {
+      return res.status(400).json({ error: "Datos inválidos", glosa: "La vigencia debe estar entre 1 y 1440 minutos." });
+    }
+    const doc = await pool.query(
+      `SELECT 1 FROM documentos_contrato d JOIN contratos ON contratos.id = d.contract_id
+        WHERE d.contract_id = $1 AND ${CONTRATO_DE_MI_EMPRESA.replace("$EMP", "$2")} LIMIT 1`,
+      [req.params.id, req.usuario.empresaId]
+    );
+    if (!doc.rows.length) return res.status(404).json({ error: "No encontrado", glosa: "El contrato no tiene un documento para compartir." });
+    const { token, expiraEn } = crearEnlace(Number(req.params.id), req.usuario.empresaId, minutos);
+    await registrarAuditoria(pool, req.usuario, `DOCUMENTOS_COMPARTIR: generó enlace del contrato ID ${req.params.id} por ${minutos} minutos`);
+    res.status(201).json({ url: `/contratos/compartido/${token}`, expira_en: expiraEn.toISOString() });
   } catch (err) {
     next(err);
   }

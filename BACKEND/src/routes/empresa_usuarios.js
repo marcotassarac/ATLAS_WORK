@@ -4,6 +4,7 @@ const { registrarAuditoria } = require("../auditoria");
 const { validarId } = require("../errores");
 const { validarCliente, validarContrato, validarEmpresa, validarUsuarioNuevo, Validador, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
+const { esUltimoAdministrador } = require("../usuariosEmpresa");
 const { erroresPolitica, mensajePolitica, hashear } = require("../seguridad/contrasenas");
 
 const router = express.Router();
@@ -130,6 +131,15 @@ router.put("/:id", soloAdministrador, async (req, res, next) => {
     if (!rolValido.rows.length) {
       return res.status(400).json({ error: "Datos inválidos", glosa: "El rol indicado no existe." });
     }
+    // DEF-15: la empresa no puede quedar sin administrador
+    const vinculo = await pool.query("SELECT usuario_id FROM empresa_usuarios WHERE id = $1 AND empresa_id = $2", [
+      req.params.id,
+      req.usuario.empresaId,
+    ]);
+    if (!vinculo.rows.length) return res.status(404).json({ error: "No encontrado" });
+    if (Number(rol_id) !== 1 && (await esUltimoAdministrador(pool, req.usuario.empresaId, vinculo.rows[0].usuario_id))) {
+      return res.status(409).json({ error: "Operación no permitida", glosa: "La empresa debe conservar al menos un administrador." });
+    }
     // DEF-12: la operación y su registro de auditoría se guardan juntos (todo o nada)
     const result = await transaccion(async (db) => {
       const r = await db.query(
@@ -151,6 +161,15 @@ router.put("/:id", soloAdministrador, async (req, res, next) => {
 // Eliminar vínculo
 router.delete("/:id", soloAdministrador, async (req, res, next) => {
   try {
+    // DEF-15: la empresa no puede quedar sin administrador
+    const vinculo = await pool.query("SELECT usuario_id FROM empresa_usuarios WHERE id = $1 AND empresa_id = $2", [
+      req.params.id,
+      req.usuario.empresaId,
+    ]);
+    if (!vinculo.rows.length) return res.status(404).json({ error: "No encontrado" });
+    if ((await esUltimoAdministrador(pool, req.usuario.empresaId, vinculo.rows[0].usuario_id))) {
+      return res.status(409).json({ error: "Operación no permitida", glosa: "La empresa debe conservar al menos un administrador." });
+    }
     // DEF-12: la operación y su registro de auditoría se guardan juntos (todo o nada)
     const result = await transaccion(async (db) => {
       const r = await db.query(

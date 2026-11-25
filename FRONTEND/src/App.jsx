@@ -4,7 +4,7 @@ import Layout from "./components/Layout";
 import UsuariosList from "./pages/usuarios/UsuariosList";
 import UsuarioForm from "./pages/usuarios/UsuarioForm";
 import EmpresaForm from "./pages/empresas/EmpresaForm";
-import { RequireAuth, RequireAdmin } from "./components/RoleGuard";
+import { RequireAuth, RequireAdmin, RequireAdminOPropio } from "./components/RoleGuard";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import ClientesList from "./pages/clientes/ClientesList";
@@ -57,9 +57,9 @@ export default function App() {
         <Route
           path="/usuarios/:id/editar"
           element={
-            <RequireAdmin>
+            <RequireAdminOPropio>
               <UsuarioForm />
-            </RequireAdmin>
+            </RequireAdminOPropio>
           }
         />
       </Route>
