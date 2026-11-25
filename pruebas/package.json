@@ -1,0 +1,15 @@
+{
+  "name": "atlas-pruebas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pruebas automatizadas de interfaz, accesibilidad y rendimiento de Atlas",
+  "type": "module",
+  "scripts": {
+    "e2e": "node e2e/atlas_e2e.mjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "lighthouse": "^12.0.0",
+    "playwright": "^1.50.0"
+  }
+}
