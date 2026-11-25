@@ -1,11 +1,12 @@
 const express = require("express");
 const { pool } = require("../db");
+const { soloAdministrador } = require("../middleware/autorizacion");
 const { erroresPolitica, mensajePolitica, hashear } = require("../seguridad/contrasenas");
 
 const router = express.Router();
 
 // Crear relación empresa-usuario con rol (crea usuario si no existe)
-router.post("/", async (req, res) => {
+router.post("/", soloAdministrador, async (req, res) => {
   try {
     const authUser = req.usuario;
 
@@ -13,6 +14,15 @@ router.post("/", async (req, res) => {
     let usuarioId;
     const { usuario_id, rol_id, nombre_usuario, contrasena_hash, correo } =
       req.body;
+
+    if (!rol_id) {
+      return res.status(400).json({ error: "Datos inválidos", glosa: "El campo rol_id es requerido" });
+    }
+    // DEF-05: solo se pueden asignar los roles del catálogo (1 administrador, 2 editor)
+    const rolValido = await pool.query("SELECT id FROM roles WHERE id = $1", [Number(rol_id)]);
+    if (!rolValido.rows.length) {
+      return res.status(400).json({ error: "Datos inválidos", glosa: "El rol indicado no existe." });
+    }
 
     // Si viene usuario_id, usar ese (compatibilidad con formato anterior)
     // Si vienen datos del usuario, crear el usuario primero
@@ -125,9 +135,14 @@ router.get("/:id", async (req, res) => {
 });
 
 // Actualizar vínculo
-router.put("/:id", async (req, res) => {
+router.put("/:id", soloAdministrador, async (req, res) => {
   const { empresa_id, usuario_id, rol_id } = req.body;
   try {
+    // DEF-05: solo se pueden asignar los roles del catálogo (1 administrador, 2 editor)
+    const rolValido = await pool.query("SELECT id FROM roles WHERE id = $1", [Number(rol_id)]);
+    if (!rolValido.rows.length) {
+      return res.status(400).json({ error: "Datos inválidos", glosa: "El rol indicado no existe." });
+    }
     const result = await pool.query(
       "UPDATE empresa_usuarios SET empresa_id=$1, usuario_id=$2, rol_id=$3 WHERE id=$4 RETURNING *",
       [empresa_id, usuario_id, rol_id, req.params.id]
@@ -155,7 +170,7 @@ router.put("/:id", async (req, res) => {
 });
 
 // Eliminar vínculo
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", soloAdministrador, async (req, res) => {
   try {
     const result = await pool.query(
       "DELETE FROM empresa_usuarios WHERE id=$1 RETURNING *",

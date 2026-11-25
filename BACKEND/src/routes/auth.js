@@ -23,9 +23,11 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
 
-    // Obtener el empresa_usuario id y empresa_id más reciente para este usuario
+    // Obtener el empresa_usuario id, empresa_id y rol más reciente para este usuario
     const empresaUsuarioResult = await pool.query(
-      "SELECT id, empresa_id FROM empresa_usuarios WHERE usuario_id = $1 ORDER BY id DESC LIMIT 1",
+      `SELECT eu.id, eu.empresa_id, r.nombre AS rol
+         FROM empresa_usuarios eu LEFT JOIN roles r ON r.id = eu.rol_id
+        WHERE eu.usuario_id = $1 ORDER BY eu.id DESC LIMIT 1`,
       [user.id]
     );
     const empresaUsuarioId = empresaUsuarioResult.rows.length > 0 
@@ -40,7 +42,10 @@ router.post("/login", async (req, res) => {
         usuarioId: user.id, 
         nombreUsuario: user.nombre_usuario,
         empresaUsuarioId: empresaUsuarioId,
-        empresaId: empresaId
+        empresaId: empresaId,
+        // DEF-05: el rol viaja en el token solo para que la interfaz muestre las
+        // opciones correctas; el servidor siempre lo vuelve a consultar en la base.
+        rol: empresaUsuarioResult.rows[0]?.rol || "editor",
       },
       JWT_SECRET,
       { expiresIn: "2h" }

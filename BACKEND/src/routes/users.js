@@ -1,11 +1,12 @@
 const express = require("express");
 const { pool } = require("../db");
+const { soloAdministrador } = require("../middleware/autorizacion");
 const { erroresPolitica, mensajePolitica, hashear } = require("../seguridad/contrasenas");
 
 const router = express.Router();
 
 // Crear usuario
-router.post("/", async (req, res) => {
+router.post("/", soloAdministrador, async (req, res) => {
   const { nombre_usuario, contrasena_hash, correo } = req.body;
   try {
     const erroresClave = erroresPolitica(contrasena_hash);
@@ -73,7 +74,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // Actualizar usuario
-router.put("/:id", async (req, res) => {
+router.put("/:id", soloAdministrador, async (req, res) => {
   const { nombre_usuario, contrasena_hash, correo } = req.body;
   try {
     const erroresClave = contrasena_hash === undefined ? [] : erroresPolitica(contrasena_hash);
@@ -107,7 +108,7 @@ router.put("/:id", async (req, res) => {
 });
 
 // Eliminar usuario
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", soloAdministrador, async (req, res) => {
   try {
     const result = await pool.query(
       "DELETE FROM usuarios WHERE id=$1 RETURNING *",

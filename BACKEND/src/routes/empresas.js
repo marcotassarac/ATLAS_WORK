@@ -1,10 +1,11 @@
 const express = require("express");
 const { pool } = require("../db");
+const { soloAdministrador } = require("../middleware/autorizacion");
 
 const router = express.Router();
 
 // Crear empresa adicional (usuario autenticado). El registro público está en /registro.
-router.post("/", async (req, res) => {
+router.post("/", soloAdministrador, async (req, res) => {
   // Formato anterior: solo crear empresa
   const { nombre, direccion = null, telefono = null, correo } = req.body;
   try {
@@ -71,7 +72,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // Actualizar empresa
-router.put("/:id", async (req, res) => {
+router.put("/:id", soloAdministrador, async (req, res) => {
   const { nombre, direccion = null, telefono = null, correo } = req.body;
   try {
     const result = await pool.query(
@@ -103,7 +104,7 @@ router.put("/:id", async (req, res) => {
 });
 
 // Eliminar empresa
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", soloAdministrador, async (req, res) => {
   try {
     const result = await pool.query(
       "DELETE FROM empresas WHERE id=$1 RETURNING *",

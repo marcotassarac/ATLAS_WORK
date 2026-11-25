@@ -17,13 +17,13 @@ export default function UsuariosTabCreate({ onSuccess, onLoad }) {
     nombre_usuario: "",
     correo: "",
     contrasena_hash: "",
-    rol_id: 1, // Valor por defecto: administrador
+    rol_id: 2, // DEF-05: por defecto, el rol de menor privilegio (editor)
   });
 
   const onCreate = async () => {
     await api.post("/empresa-usuarios", form);
     toast.success("Usuario creado");
-    setForm({ nombre_usuario: "", correo: "", contrasena_hash: "", rol_id: 1 });
+    setForm({ nombre_usuario: "", correo: "", contrasena_hash: "", rol_id: 2 });
     onLoad();
     onSuccess(); // Cambiar a la pestaña de listar después de crear
   };

@@ -1,11 +1,12 @@
 const express = require("express");
 const { pool } = require("../db");
+const { soloAdministrador } = require("../middleware/autorizacion");
 
 const router = express.Router();
 
 
 // Crear cliente (empresa)
-router.post("/", async (req, res) => {
+router.post("/", soloAdministrador, async (req, res) => {
   const {
     nombre,
     correo,
@@ -168,7 +169,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // Editar cliente (validando que pertenezca a la empresa del token)
-router.put("/:id", async (req, res) => {
+router.put("/:id", soloAdministrador, async (req, res) => {
   const {
     nombre,
     correo,
@@ -267,7 +268,7 @@ router.put("/:id", async (req, res) => {
 });
 
 // Eliminar cliente (validando que pertenezca a la empresa del token)
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", soloAdministrador, async (req, res) => {
   try {
     const authUser = req.usuario;
 

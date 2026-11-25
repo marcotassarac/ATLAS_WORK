@@ -1,14 +1,14 @@
 // DEF-04: autenticación obligatoria para toda la API (NFR-SEG-4, NFR-SEG-9).
-// Antes cada ruta decidía si verificaba el token y varias no lo hacían.
-// Ahora app.js aplica este middleware a todo lo que no es explícitamente público.
+// DEF-05: el rol se obtiene de la base en cada solicitud, no del cliente.
 const jwt = require("jsonwebtoken");
 const { JWT_SECRET } = require("../config");
+const { pool } = require("../db");
 
 function noAutorizado(res, glosa) {
   return res.status(401).json({ error: "No autorizado", glosa });
 }
 
-function autenticar(req, res, next) {
+async function autenticar(req, res, next) {
   const cabecera = req.headers.authorization || "";
   if (!cabecera.startsWith("Bearer ")) return noAutorizado(res, "Debe iniciar sesión.");
   let datos;
@@ -19,13 +19,28 @@ function autenticar(req, res, next) {
     return noAutorizado(res, "La sesión no es válida o expiró.");
   }
   if (!datos.usuarioId || !datos.empresaId) return noAutorizado(res, "La sesión no tiene una empresa asociada.");
-  req.usuario = {
-    usuarioId: datos.usuarioId,
-    nombreUsuario: datos.nombreUsuario,
-    empresaId: datos.empresaId,
-    empresaUsuarioId: datos.empresaUsuarioId,
-  };
-  return next();
+  try {
+    // DEF-05: pertenencia y rol vigentes. Si el usuario fue eliminado de la empresa
+    // o su rol cambió, el cambio aplica de inmediato aunque el token siga vigente.
+    const { rows } = await pool.query(
+      `SELECT eu.id, r.nombre AS rol
+         FROM empresa_usuarios eu JOIN roles r ON r.id = eu.rol_id
+        WHERE eu.usuario_id = $1 AND eu.empresa_id = $2
+        ORDER BY eu.id DESC LIMIT 1`,
+      [datos.usuarioId, datos.empresaId]
+    );
+    if (!rows.length) return noAutorizado(res, "El usuario ya no pertenece a la empresa.");
+    req.usuario = {
+      usuarioId: Number(datos.usuarioId),
+      nombreUsuario: datos.nombreUsuario,
+      empresaId: Number(datos.empresaId),
+      empresaUsuarioId: Number(rows[0].id),
+      rol: rows[0].rol,
+    };
+    return next();
+  } catch (err) {
+    return next(err);
+  }
 }
 
 module.exports = { autenticar };

@@ -3,6 +3,7 @@ const fs = require("fs");
 const express = require("express");
 const multer = require("multer");
 const { pool } = require("../db");
+const { soloAdministrador } = require("../middleware/autorizacion");
 
 const router = express.Router();
 
@@ -11,7 +12,7 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 // Crear contrato con archivo PDF (guardado en DB como bytea)
-router.post("/", upload.single("file"), async (req, res) => {
+router.post("/", soloAdministrador, upload.single("file"), async (req, res) => {
   const {
     cliente_id,
     titulo,
@@ -251,7 +252,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // Actualizar contrato
-router.put("/:id", upload.single("file"), async (req, res) => {
+router.put("/:id", soloAdministrador, upload.single("file"), async (req, res) => {
   try {
     const authUser = req.usuario;
 
@@ -384,7 +385,7 @@ router.get("/:id/file", async (req, res) => {
 });
 
 // Eliminar contrato y su archivo
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", soloAdministrador, async (req, res) => {
   try {
     await pool.query("DELETE FROM documentos_contrato WHERE contract_id=$1", [
       req.params.id,
