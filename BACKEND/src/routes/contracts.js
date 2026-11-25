@@ -1,8 +1,8 @@
 const path = require("path");
 const fs = require("fs");
 const express = require("express");
-const multer = require("multer");
 const { pool } = require("../db");
+const { subirDocumento } = require("../archivos");
 const { validarId } = require("../errores");
 const { validarCliente, validarContrato, validarEmpresa, validarUsuarioNuevo, Validador, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
@@ -11,8 +11,6 @@ const router = express.Router();
 router.param("id", validarId); // DEF-10: id numérico o 400
 
 
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
 
 // DEF-06: condición que asegura que el contrato pertenece a la empresa de la sesión
 // (los contratos se relacionan con la empresa a través de su cliente).
@@ -25,7 +23,7 @@ async function clienteDeMiEmpresa(clienteId, empresaId) {
 }
 
 // Crear contrato con archivo PDF (guardado en DB como bytea)
-router.post("/", soloAdministrador, upload.single("file"), async (req, res, next) => {
+router.post("/", soloAdministrador, subirDocumento, async (req, res, next) => {
   // DEF-09: validación de cliente, título, descripción y fechas
   const { datos, errores } = validarContrato(req.body);
   if (hayErrores(errores)) return responderErrores(res, errores);
@@ -41,10 +39,11 @@ router.post("/", soloAdministrador, upload.single("file"), async (req, res, next
       [clientIdNum, titulo, descripcion, fecha_inicio, fecha_fin]
     );
 
-    if (req.file && req.file.buffer) {
+    if (req.documento) {
+      const d = req.documento;
       await pool.query(
-        "INSERT INTO documentos_contrato (contract_id, document) VALUES ($1, $2)",
-        [contractInsert.rows[0].id, req.file.buffer]
+        "INSERT INTO documentos_contrato (contract_id, document, nombre_archivo, tipo_mime, tamano, sha256) VALUES ($1, $2, $3, $4, $5, $6)",
+        [contractInsert.rows[0].id, d.buffer, d.nombre, d.mime, d.tamano, d.sha256]
       );
     }
 
@@ -247,7 +246,7 @@ router.get("/:id", async (req, res, next) => {
 });
 
 // Actualizar contrato
-router.put("/:id", soloAdministrador, upload.single("file"), async (req, res, next) => {
+router.put("/:id", soloAdministrador, subirDocumento, async (req, res, next) => {
   try {
     const authUser = req.usuario;
 
@@ -333,11 +332,12 @@ router.put("/:id", soloAdministrador, upload.single("file"), async (req, res, ne
     );
 
     // Si se envía un nuevo archivo, actualizarlo
-    if (req.file && req.file.buffer) {
+    if (req.documento) {
+      const d = req.documento;
       // Insertar nuevo documento (manteniendo el historial)
       await pool.query(
-        "INSERT INTO documentos_contrato (contract_id, document) VALUES ($1, $2)",
-        [contratoId, req.file.buffer]
+        "INSERT INTO documentos_contrato (contract_id, document, nombre_archivo, tipo_mime, tamano, sha256) VALUES ($1, $2, $3, $4, $5, $6)",
+        [contratoId, d.buffer, d.nombre, d.mime, d.tamano, d.sha256]
       );
     }
 
@@ -362,7 +362,7 @@ router.put("/:id", soloAdministrador, upload.single("file"), async (req, res, ne
 router.get("/:id/file", async (req, res, next) => {
   try {
     const doc = await pool.query(
-      `SELECT d.document FROM documentos_contrato d
+      `SELECT d.document, d.nombre_archivo, d.tipo_mime FROM documentos_contrato d
          JOIN contratos ON contratos.id = d.contract_id
         WHERE d.contract_id=$1 AND ${CONTRATO_DE_MI_EMPRESA.replace("$EMP", "$2")}
         ORDER BY d.id DESC LIMIT 1`,
@@ -370,9 +370,13 @@ router.get("/:id/file", async (req, res, next) => {
     );
     if (doc.rows.length === 0)
       return res.status(404).json({ error: "Documento no encontrado" });
-    const buffer = doc.rows[0].document;
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", 'inline; filename="contrato.pdf"');
+    const { document: buffer, nombre_archivo, tipo_mime } = doc.rows[0];
+    // DEF-11: se entrega con su tipo real y sin permitir que el navegador lo reinterprete
+    const nombre = encodeURIComponent(nombre_archivo || "contrato.pdf");
+    res.setHeader("Content-Type", tipo_mime || "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename*=UTF-8''${nombre}`);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "private, no-store");
     res.send(buffer);
   } catch (err) {
     next(err);

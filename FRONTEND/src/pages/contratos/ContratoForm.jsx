@@ -209,7 +209,7 @@ export default function ContratoForm() {
               label="Archivo"
               InputLabelProps={{ shrink: true }}
               inputProps={{
-                accept: ".pdf",
+                accept: ".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png", // RF-5.2
                 "data-testid": "input-contrato-archivo",
               }}
               onChange={(e) => setFile(e.target.files?.[0] || null)}

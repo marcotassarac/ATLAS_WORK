@@ -139,7 +139,7 @@ export default function ContratosTabCreate({ onSuccess, onLoad }) {
           label="Archivo"
           InputLabelProps={{ shrink: true }}
           inputProps={{
-            accept: ".pdf,.doc,.docx,.xls,.xlsx",
+            accept: ".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png", // RF-5.2 (antes aceptaba .xls)
           }}
           onChange={(e) => setFile(e.target.files?.[0] || null)}
           variant="outlined"
