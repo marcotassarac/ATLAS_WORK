@@ -43,7 +43,7 @@ export default function App() {
         <Route path="/contratos/:id/editar" element={<RequireAdmin><ContratoForm /></RequireAdmin>} />
         <Route path="/contratos/:id" element={<ContratoDetalle />} />
         <Route path="/empresas/:id/editar" element={<RequireAdmin><EmpresaForm /></RequireAdmin>} />
-        <Route path="/auditoria" element={<AuditoriaList />} />
+        <Route path="/auditoria" element={<RequireAdmin><AuditoriaList /></RequireAdmin>} />
         <Route
           path="/usuarios"
           element={

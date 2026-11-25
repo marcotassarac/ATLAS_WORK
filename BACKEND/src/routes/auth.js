@@ -2,6 +2,7 @@ const express = require("express");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const { pool } = require("../db");
+const { registrarAuditoria } = require("../auditoria");
 const { verificar } = require("../seguridad/contrasenas");
 const { autenticar } = require("../middleware/autenticacion");
 const { limiteLoginPorIp, limiteLoginPorUsuario } = require("../middleware/limites");
@@ -56,10 +57,7 @@ router.post("/login", limiteLoginPorIp, limiteLoginPorUsuario, async (req, res, 
     );
 
     // Registrar en auditoría
-    await pool.query(
-      "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
-      [user.nombre_usuario, "LOGIN: usuario inició sesión"]
-    );
+    await registrarAuditoria(pool, { nombreUsuario: user.nombre_usuario, empresaId }, "LOGIN: usuario inició sesión");
 
     res.json({ token });
   } catch (err) {
@@ -71,17 +69,14 @@ router.post("/login", limiteLoginPorIp, limiteLoginPorUsuario, async (req, res, 
 // hasta su vencimiento aunque el usuario cerrara sesión.
 router.post("/logout", autenticar, async (req, res, next) => {
   try {
-    const { jti, exp, usuarioId, nombreUsuario } = req.usuario;
+    const { jti, exp, usuarioId } = req.usuario;
     await pool.query(
       "INSERT INTO tokens_revocados (jti, usuario_id, expira_en) VALUES ($1, $2, to_timestamp($3)) ON CONFLICT (jti) DO NOTHING",
       [jti, usuarioId, exp]
     );
     // Limpieza de revocaciones que ya vencieron (no necesitan seguir guardadas)
     await pool.query("DELETE FROM tokens_revocados WHERE expira_en < now()");
-    await pool.query("INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)", [
-      nombreUsuario,
-      "LOGOUT: usuario cerró sesión",
-    ]);
+    await registrarAuditoria(pool, req.usuario, "LOGOUT: usuario cerró sesión");
     res.status(204).end();
   } catch (err) {
     next(err);

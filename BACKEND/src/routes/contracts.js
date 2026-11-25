@@ -1,16 +1,14 @@
-const path = require("path");
-const fs = require("fs");
+// Gestión de contratos y documentos (RF-5).
 const express = require("express");
-const { pool } = require("../db");
+const { pool, transaccion } = require("../db");
+const { registrarAuditoria } = require("../auditoria");
 const { subirDocumento } = require("../archivos");
 const { validarId } = require("../errores");
-const { validarCliente, validarContrato, validarEmpresa, validarUsuarioNuevo, Validador, hayErrores, responderErrores } = require("../validacion");
+const { validarContrato, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
 
 const router = express.Router();
 router.param("id", validarId); // DEF-10: id numérico o 400
-
-
 
 // DEF-06: condición que asegura que el contrato pertenece a la empresa de la sesión
 // (los contratos se relacionan con la empresa a través de su cliente).
@@ -33,31 +31,24 @@ router.post("/", soloAdministrador, subirDocumento, async (req, res, next) => {
     if (!(await clienteDeMiEmpresa(cliente_id, req.usuario.empresaId))) {
       return res.status(404).json({ error: "No encontrado", glosa: "El cliente no existe en su empresa." });
     }
-    const clientIdNum = Number(cliente_id);
-    const contractInsert = await pool.query(
-      "INSERT INTO contratos (cliente_id, titulo, descripcion, fecha_inicio, fecha_fin) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-      [clientIdNum, titulo, descripcion, fecha_inicio, fecha_fin]
-    );
-
-    if (req.documento) {
-      const d = req.documento;
-      await pool.query(
-        "INSERT INTO documentos_contrato (contract_id, document, nombre_archivo, tipo_mime, tamano, sha256) VALUES ($1, $2, $3, $4, $5, $6)",
-        [contractInsert.rows[0].id, d.buffer, d.nombre, d.mime, d.tamano, d.sha256]
+    const contrato = await transaccion(async (db) => {
+      const r = await db.query(
+        "INSERT INTO contratos (cliente_id, titulo, descripcion, fecha_inicio, fecha_fin) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+        [cliente_id, titulo, descripcion, fecha_inicio, fecha_fin]
       );
-    }
+      if (req.documento) {
+        const d = req.documento;
+        await db.query(
+          "INSERT INTO documentos_contrato (contract_id, document, nombre_archivo, tipo_mime, tamano, sha256) VALUES ($1, $2, $3, $4, $5, $6)",
+          [r.rows[0].id, d.buffer, d.nombre, d.mime, d.tamano, d.sha256]
+        );
+      }
+      // DEF-12: operación, documento y auditoría en una sola transacción
+      await registrarAuditoria(db, req.usuario, `CONTRATOS_CREAR: creó contrato ID ${r.rows[0].id} para cliente ID ${cliente_id}`);
+      return r.rows[0];
+    });
 
-    const result = contractInsert;
-    const authUser = req.usuario;
-    await pool.query(
-      "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
-      [
-        authUser.nombreUsuario,
-        `CONTRATOS_CREAR: creó contrato ${titulo} para cliente ${cliente_id}`,
-      ]
-    );
-
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(contrato);
   } catch (err) {
     next(err);
   }
@@ -323,34 +314,25 @@ router.put("/:id", soloAdministrador, subirDocumento, async (req, res, next) => 
 
     // Agregar el ID del contrato al final
     values.push(contratoId);
-    const result = await pool.query(
-      `UPDATE contratos 
-       SET ${updates.join(", ")}
-       WHERE id = $${paramIndex}
-       RETURNING *`,
-      values
-    );
-
-    // Si se envía un nuevo archivo, actualizarlo
-    if (req.documento) {
-      const d = req.documento;
-      // Insertar nuevo documento (manteniendo el historial)
-      await pool.query(
-        "INSERT INTO documentos_contrato (contract_id, document, nombre_archivo, tipo_mime, tamano, sha256) VALUES ($1, $2, $3, $4, $5, $6)",
-        [contratoId, d.buffer, d.nombre, d.mime, d.tamano, d.sha256]
+    const result = await transaccion(async (db) => {
+      const r = await db.query(
+        `UPDATE contratos
+         SET ${updates.join(", ")}
+         WHERE id = $${paramIndex}
+         RETURNING *`,
+        values
       );
-    }
-
-    // Registrar en auditoría
-    await pool.query(
-      "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
-      [
-        authUser.nombreUsuario,
-        `CONTRATOS_ACTUALIZAR: actualizó contrato ID ${contratoId} - ${
-          titulo || contratoExistente.rows[0].titulo
-        }`,
-      ]
-    );
+      // Si se envía un nuevo archivo, se agrega (se mantiene el historial)
+      if (req.documento) {
+        const d = req.documento;
+        await db.query(
+          "INSERT INTO documentos_contrato (contract_id, document, nombre_archivo, tipo_mime, tamano, sha256) VALUES ($1, $2, $3, $4, $5, $6)",
+          [contratoId, d.buffer, d.nombre, d.mime, d.tamano, d.sha256]
+        );
+      }
+      await registrarAuditoria(db, req.usuario, `CONTRATOS_ACTUALIZAR: actualizó contrato ID ${contratoId}`);
+      return r;
+    });
 
     res.json(result.rows[0]);
   } catch (err) {
@@ -377,6 +359,8 @@ router.get("/:id/file", async (req, res, next) => {
     res.setHeader("Content-Disposition", `inline; filename*=UTF-8''${nombre}`);
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Cache-Control", "private, no-store");
+    // DEF-12: RF-6.1 exige registrar también las descargas de documentos
+    await registrarAuditoria(pool, req.usuario, `DOCUMENTOS_DESCARGAR: descargó documento del contrato ID ${req.params.id}`);
     res.send(buffer);
   } catch (err) {
     next(err);
@@ -393,22 +377,11 @@ router.delete("/:id", soloAdministrador, async (req, res, next) => {
     );
     if (propio.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });
-    await pool.query("DELETE FROM documentos_contrato WHERE contract_id=$1", [
-      req.params.id,
-    ]);
-    const result = await pool.query(
-      "DELETE FROM contratos WHERE id=$1 RETURNING *",
-      [req.params.id]
-    );
-
-    const authUser = req.usuario;
-    await pool.query(
-      "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
-      [
-        authUser.nombreUsuario,
-        `CONTRATOS_ELIMINAR: eliminó contrato ID ${req.params.id}`,
-      ]
-    );
+    await transaccion(async (db) => {
+      await db.query("DELETE FROM documentos_contrato WHERE contract_id=$1", [req.params.id]);
+      await db.query("DELETE FROM contratos WHERE id=$1", [req.params.id]);
+      await registrarAuditoria(db, req.usuario, `CONTRATOS_ELIMINAR: eliminó contrato ID ${req.params.id}`);
+    });
 
     res.json({ deleted: true });
   } catch (err) {

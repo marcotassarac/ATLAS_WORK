@@ -34,9 +34,10 @@ export default function Layout() {
     { to: "/home", label: "Inicio", icon: <HomeIcon /> },
     { to: "/clientes", label: "Clientes", icon: <BusinessIcon /> },
     { to: "/contratos", label: "Contratos", icon: <DescriptionIcon /> },
-    { to: "/auditoria", label: "Auditoría", icon: <HistoryIcon /> },
   ];
+  // DEF-12: la auditoría es solo para el administrador (el servidor responde 403 al editor)
   const adminItems = [
+    { to: "/auditoria", label: "Auditoría", icon: <HistoryIcon /> },
     { to: "/usuarios", label: "Usuarios", icon: <PeopleIcon /> },
   ];
 

@@ -1,11 +1,13 @@
 const express = require("express");
-const { pool } = require("../db");
+const { pool, transaccion } = require("../db");
+const { registrarAuditoria } = require("../auditoria");
 const { validarId } = require("../errores");
 const { validarCliente, validarContrato, validarEmpresa, validarUsuarioNuevo, Validador, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
 const { erroresPolitica, mensajePolitica, hashear } = require("../seguridad/contrasenas");
 
 const router = express.Router();
+const vu_datos = (b) => validarUsuarioNuevo(b).datos;
 router.param("id", validarId); // DEF-10: id numérico o 400
 
 // Crear relación empresa-usuario con rol (crea usuario si no existe)
@@ -40,11 +42,6 @@ router.post("/", soloAdministrador, async (req, res, next) => {
       if (erroresClave.length) {
         return res.status(400).json({ error: "Contraseña insegura", glosa: mensajePolitica(erroresClave) });
       }
-      const usuarioResult = await pool.query(
-        "INSERT INTO usuarios (nombre_usuario, contrasena_hash, correo) VALUES ($1, $2, $3) RETURNING id, nombre_usuario, correo, created_at",
-        [nombre_usuario, await hashear(contrasena_hash), correo]
-      );
-      usuarioId = usuarioResult.rows[0].id;
     } else {
       return res.status(400).json({
         error: "Datos inválidos",
@@ -53,27 +50,22 @@ router.post("/", soloAdministrador, async (req, res, next) => {
       });
     }
 
-    // Validar que venga rol_id
-    if (!rol_id) {
-      return res.status(400).json({
-        error: "Datos inválidos",
-        glosa: "El campo rol_id es requerido",
-      });
-    }
-
-    // Crear relación empresa-usuario
-    const result = await pool.query(
-      "INSERT INTO empresa_usuarios (empresa_id, usuario_id, rol_id) VALUES ($1, $2, $3) RETURNING *",
-      [empresaId, usuarioId, rol_id]
-    );
-
-    await pool.query(
-      "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
-      [
-        authUser.nombreUsuario,
-        `EMPRESA_USUARIOS_CREAR: vinculó usuario ${usuarioId} a empresa ${empresaId} con rol ${rol_id}`,
-      ]
-    );
+    // DEF-12: usuario, vínculo con la empresa y auditoría en una sola transacción.
+    // Antes, si fallaba el vínculo, quedaba un usuario creado sin empresa.
+    const hash = await hashear(contrasena_hash);
+    const result = await transaccion(async (db) => {
+      const u = await db.query(
+        "INSERT INTO usuarios (nombre_usuario, contrasena_hash, correo) VALUES ($1, $2, $3) RETURNING id",
+        [vu_datos(req.body).nombre_usuario, hash, vu_datos(req.body).correo]
+      );
+      usuarioId = u.rows[0].id;
+      const r = await db.query(
+        "INSERT INTO empresa_usuarios (empresa_id, usuario_id, rol_id) VALUES ($1, $2, $3) RETURNING *",
+        [empresaId, usuarioId, Number(rol_id)]
+      );
+      await registrarAuditoria(db, req.usuario, `EMPRESA_USUARIOS_CREAR: creó usuario ID ${usuarioId} con rol ${Number(rol_id)}`);
+      return r;
+    });
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -138,21 +130,17 @@ router.put("/:id", soloAdministrador, async (req, res, next) => {
     if (!rolValido.rows.length) {
       return res.status(400).json({ error: "Datos inválidos", glosa: "El rol indicado no existe." });
     }
-    const result = await pool.query(
-      "UPDATE empresa_usuarios SET rol_id=$1 WHERE id=$2 AND empresa_id=$3 RETURNING *",
-      [rol_id, req.params.id, req.usuario.empresaId]
-    );
+    // DEF-12: la operación y su registro de auditoría se guardan juntos (todo o nada)
+    const result = await transaccion(async (db) => {
+      const r = await db.query(
+        "UPDATE empresa_usuarios SET rol_id=$1 WHERE id=$2 AND empresa_id=$3 RETURNING *",
+        [rol_id, req.params.id, req.usuario.empresaId]
+      );
+      if (r.rows.length) await registrarAuditoria(db, req.usuario, `EMPRESA_USUARIOS_ACTUALIZAR: actualizó vínculo ID ${req.params.id}`);
+      return r;
+    });
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });
-
-    const authUser = req.usuario;
-    await pool.query(
-      "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
-      [
-        authUser.nombreUsuario,
-        `EMPRESA_USUARIOS_ACTUALIZAR: actualizó vínculo ID ${req.params.id}`,
-      ]
-    );
 
     res.json(result.rows[0]);
   } catch (err) {
@@ -163,21 +151,17 @@ router.put("/:id", soloAdministrador, async (req, res, next) => {
 // Eliminar vínculo
 router.delete("/:id", soloAdministrador, async (req, res, next) => {
   try {
-    const result = await pool.query(
-      "DELETE FROM empresa_usuarios WHERE id=$1 AND empresa_id=$2 RETURNING *",
-      [req.params.id, req.usuario.empresaId]
-    );
+    // DEF-12: la operación y su registro de auditoría se guardan juntos (todo o nada)
+    const result = await transaccion(async (db) => {
+      const r = await db.query(
+        "DELETE FROM empresa_usuarios WHERE id=$1 AND empresa_id=$2 RETURNING *",
+        [req.params.id, req.usuario.empresaId]
+      );
+      if (r.rows.length) await registrarAuditoria(db, req.usuario, `EMPRESA_USUARIOS_ELIMINAR: eliminó vínculo ID ${req.params.id}`);
+      return r;
+    });
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });
-
-    const authUser = req.usuario;
-    await pool.query(
-      "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
-      [
-        authUser.nombreUsuario,
-        `EMPRESA_USUARIOS_ELIMINAR: eliminó vínculo ID ${req.params.id}`,
-      ]
-    );
 
     res.json({ deleted: true });
   } catch (err) {

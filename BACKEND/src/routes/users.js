@@ -1,5 +1,6 @@
 const express = require("express");
-const { pool } = require("../db");
+const { pool, transaccion } = require("../db");
+const { registrarAuditoria } = require("../auditoria");
 const { validarId } = require("../errores");
 const { validarCliente, validarContrato, validarEmpresa, validarUsuarioNuevo, Validador, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
@@ -63,22 +64,18 @@ router.put("/:id", soloAdministrador, async (req, res, next) => {
     if (erroresClave.length) {
       return res.status(400).json({ error: "Contraseña insegura", glosa: mensajePolitica(erroresClave) });
     }
-    const result = await pool.query(
-      `UPDATE usuarios SET nombre_usuario=$1, contrasena_hash=COALESCE($2, contrasena_hash), correo=$3
-        WHERE id=$4 AND ${EN_MI_EMPRESA.replace("$EMP", "$5")} RETURNING id, nombre_usuario, correo, created_at`,
-      [nombre_usuario, contrasena_hash === undefined ? null : await hashear(contrasena_hash), correo, req.params.id, req.usuario.empresaId]
-    );
+    // DEF-12: la operación y su registro de auditoría se guardan juntos (todo o nada)
+    const result = await transaccion(async (db) => {
+      const r = await db.query(
+        `UPDATE usuarios SET nombre_usuario=$1, contrasena_hash=COALESCE($2, contrasena_hash), correo=$3
+          WHERE id=$4 AND ${EN_MI_EMPRESA.replace("$EMP", "$5")} RETURNING id, nombre_usuario, correo, created_at`,
+        [nombre_usuario, contrasena_hash === undefined ? null : await hashear(contrasena_hash), correo, req.params.id, req.usuario.empresaId]
+      );
+      if (r.rows.length) await registrarAuditoria(db, req.usuario, `USUARIOS_ACTUALIZAR: actualizó usuario ID ${req.params.id}`);
+      return r;
+    });
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });
-
-    const authUser = req.usuario;
-    await pool.query(
-      "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
-      [
-        authUser.nombreUsuario,
-        `USUARIOS_ACTUALIZAR: actualizó usuario ID ${req.params.id}`,
-      ]
-    );
 
     res.json(result.rows[0]);
   } catch (err) {
@@ -89,21 +86,17 @@ router.put("/:id", soloAdministrador, async (req, res, next) => {
 // Eliminar usuario
 router.delete("/:id", soloAdministrador, async (req, res, next) => {
   try {
-    const result = await pool.query(
-      `DELETE FROM usuarios WHERE id=$1 AND ${EN_MI_EMPRESA.replace("$EMP", "$2")} RETURNING id`,
-      [req.params.id, req.usuario.empresaId]
-    );
+    // DEF-12: la operación y su registro de auditoría se guardan juntos (todo o nada)
+    const result = await transaccion(async (db) => {
+      const r = await db.query(
+        `DELETE FROM usuarios WHERE id=$1 AND ${EN_MI_EMPRESA.replace("$EMP", "$2")} RETURNING id`,
+        [req.params.id, req.usuario.empresaId]
+      );
+      if (r.rows.length) await registrarAuditoria(db, req.usuario, `USUARIOS_ELIMINAR: eliminó usuario ID ${req.params.id}`);
+      return r;
+    });
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });
-
-    const authUser = req.usuario;
-    await pool.query(
-      "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
-      [
-        authUser.nombreUsuario,
-        `USUARIOS_ELIMINAR: eliminó usuario ID ${req.params.id}`,
-      ]
-    );
 
     res.json({ deleted: true });
   } catch (err) {

@@ -1,5 +1,6 @@
 const express = require("express");
-const { pool } = require("../db");
+const { pool, transaccion } = require("../db");
+const { registrarAuditoria } = require("../auditoria");
 const { validarId } = require("../errores");
 const { validarCliente, validarContrato, validarEmpresa, validarUsuarioNuevo, Validador, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
@@ -44,21 +45,17 @@ router.put("/:id", soloAdministrador, async (req, res, next) => {
   if (hayErrores(errores)) return responderErrores(res, errores);
   const { nombre, direccion, telefono, correo } = datos;
   try {
-    const result = await pool.query(
-      "UPDATE empresas SET nombre=$1, direccion=$2, telefono=$3, correo=$4 WHERE id=$5 AND id=$6 RETURNING *",
-      [nombre, direccion, telefono, correo, req.params.id, req.usuario.empresaId]
-    );
+    // DEF-12: la operación y su registro de auditoría se guardan juntos (todo o nada)
+    const result = await transaccion(async (db) => {
+      const r = await db.query(
+        "UPDATE empresas SET nombre=$1, direccion=$2, telefono=$3, correo=$4 WHERE id=$5 AND id=$6 RETURNING *",
+        [nombre, direccion, telefono, correo, req.params.id, req.usuario.empresaId]
+      );
+      if (r.rows.length) await registrarAuditoria(db, req.usuario, `EMPRESAS_ACTUALIZAR: actualizó empresa ID ${req.params.id}`);
+      return r;
+    });
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });
-
-    const authUser = req.usuario;
-    await pool.query(
-      "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
-      [
-        authUser.nombreUsuario,
-        `EMPRESAS_ACTUALIZAR: actualizó empresa ID ${req.params.id}`,
-      ]
-    );
 
     res.json(result.rows[0]);
   } catch (err) {
