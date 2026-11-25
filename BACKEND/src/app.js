@@ -49,6 +49,15 @@ app.get("/", (req, res) => {
 });
 
 const { PORT } = require("./config");
-app.listen(PORT, () => {
-  console.log(`Atlas API escuchando en puerto ${PORT}`);
-});
+const { migrar } = require("./migraciones");
+
+migrar(pool)
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Atlas API escuchando en puerto ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("No se pudo iniciar la API:", err.message);
+    process.exit(1);
+  });

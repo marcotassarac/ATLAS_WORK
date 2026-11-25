@@ -1,5 +1,6 @@
 const express = require("express");
 const { pool } = require("../db");
+const { erroresPolitica, mensajePolitica, hashear } = require("../seguridad/contrasenas");
 const jwt = require("jsonwebtoken");
 
 const router = express.Router();
@@ -22,9 +23,13 @@ function getUserFromAuthHeader(req) {
 router.post("/", async (req, res) => {
   const { nombre_usuario, contrasena_hash, correo } = req.body;
   try {
+    const erroresClave = erroresPolitica(contrasena_hash);
+    if (erroresClave.length) {
+      return res.status(400).json({ error: "Contraseña insegura", glosa: mensajePolitica(erroresClave) });
+    }
     const result = await pool.query(
       "INSERT INTO usuarios (nombre_usuario, contrasena_hash, correo) VALUES ($1, $2, $3) RETURNING id, nombre_usuario, correo, created_at",
-      [nombre_usuario, contrasena_hash, correo]
+      [nombre_usuario, await hashear(contrasena_hash), correo]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -93,9 +98,13 @@ router.get("/:id", async (req, res) => {
 router.put("/:id", async (req, res) => {
   const { nombre_usuario, contrasena_hash, correo } = req.body;
   try {
+    const erroresClave = contrasena_hash === undefined ? [] : erroresPolitica(contrasena_hash);
+    if (erroresClave.length) {
+      return res.status(400).json({ error: "Contraseña insegura", glosa: mensajePolitica(erroresClave) });
+    }
     const result = await pool.query(
-      "UPDATE usuarios SET nombre_usuario=$1, contrasena_hash=$2, correo=$3 WHERE id=$4 RETURNING id, nombre_usuario, correo, created_at",
-      [nombre_usuario, contrasena_hash, correo, req.params.id]
+      "UPDATE usuarios SET nombre_usuario=$1, contrasena_hash=COALESCE($2, contrasena_hash), correo=$3 WHERE id=$4 RETURNING id, nombre_usuario, correo, created_at",
+      [nombre_usuario, contrasena_hash === undefined ? null : await hashear(contrasena_hash), correo, req.params.id]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });

@@ -1,5 +1,6 @@
 const express = require("express");
 const { pool } = require("../db");
+const { erroresPolitica, mensajePolitica, hashear } = require("../seguridad/contrasenas");
 const jwt = require("jsonwebtoken");
 
 const router = express.Router();
@@ -25,10 +26,14 @@ router.post("/", async (req, res) => {
     const { nombre, direccion = null, telefono = null, correo } = empresa;
 
     try {
+      const erroresClave = erroresPolitica(contrasena_hash);
+      if (erroresClave.length) {
+        return res.status(400).json({ error: "Contraseña insegura", glosa: mensajePolitica(erroresClave) });
+      }
       // 1. Crear usuario
       const usuarioResult = await pool.query(
         "INSERT INTO usuarios (nombre_usuario, contrasena_hash, correo) VALUES ($1, $2, $3) RETURNING id, nombre_usuario, correo, created_at",
-        [nombre_usuario, contrasena_hash, correoUsuario]
+        [nombre_usuario, await hashear(contrasena_hash), correoUsuario]
       );
       const usuarioId = usuarioResult.rows[0].id;
 

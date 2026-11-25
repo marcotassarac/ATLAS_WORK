@@ -1,13 +1,14 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const { pool } = require("../db");
+const { verificar } = require("../seguridad/contrasenas");
 
 const router = express.Router();
 
 const { JWT_SECRET } = require("../config");
 
 
-// Login simple: usuario + contraseña en texto plano
+// Inicio de sesión. DEF-03: la contraseña se compara contra su hash bcrypt.
 router.post("/login", async (req, res) => {
   const { nombre_usuario, password } = req.body;
   try {
@@ -15,11 +16,10 @@ router.post("/login", async (req, res) => {
       "SELECT id, nombre_usuario, contrasena_hash FROM usuarios WHERE nombre_usuario = $1",
       [nombre_usuario]
     );
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: "Credenciales inválidas" });
-    }
     const user = result.rows[0];
-    if (user.contrasena_hash !== password) {
+    // verificar() consume el mismo tiempo si el usuario no existe (sin enumeración)
+    const valida = await verificar(password, user ? user.contrasena_hash : undefined);
+    if (!user || !valida) {
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
 

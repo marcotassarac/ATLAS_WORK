@@ -1,5 +1,6 @@
 const express = require("express");
 const { pool } = require("../db");
+const { erroresPolitica, mensajePolitica, hashear } = require("../seguridad/contrasenas");
 const jwt = require("jsonwebtoken");
 
 const router = express.Router();
@@ -39,10 +40,14 @@ router.post("/", async (req, res) => {
     if (usuario_id) {
       usuarioId = usuario_id;
     } else if (nombre_usuario && contrasena_hash && correo) {
-      // Crear usuario primero
+      // Crear usuario primero (DEF-03: política de contraseñas y hash bcrypt)
+      const erroresClave = erroresPolitica(contrasena_hash);
+      if (erroresClave.length) {
+        return res.status(400).json({ error: "Contraseña insegura", glosa: mensajePolitica(erroresClave) });
+      }
       const usuarioResult = await pool.query(
         "INSERT INTO usuarios (nombre_usuario, contrasena_hash, correo) VALUES ($1, $2, $3) RETURNING id, nombre_usuario, correo, created_at",
-        [nombre_usuario, contrasena_hash, correo]
+        [nombre_usuario, await hashear(contrasena_hash), correo]
       );
       usuarioId = usuarioResult.rows[0].id;
     } else {
