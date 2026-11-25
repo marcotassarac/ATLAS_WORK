@@ -1,7 +1,9 @@
 const express = require("express");
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const { pool } = require("../db");
 const { verificar } = require("../seguridad/contrasenas");
+const { autenticar } = require("../middleware/autenticacion");
 
 const router = express.Router();
 
@@ -48,7 +50,8 @@ router.post("/login", async (req, res) => {
         rol: empresaUsuarioResult.rows[0]?.rol || "editor",
       },
       JWT_SECRET,
-      { expiresIn: "2h" }
+      // DEF-07: jwtid identifica el token para poder revocarlo al cerrar sesión
+      { expiresIn: "2h", algorithm: "HS256", jwtid: crypto.randomUUID() }
     );
 
     // Registrar en auditoría
@@ -63,6 +66,28 @@ router.post("/login", async (req, res) => {
     res
       .status(500)
       .json({ error: "Error en login", glosa: err.message || err.toString() });
+  }
+});
+
+// Cierre de sesión (RF-1.2). DEF-07: antes no existía; el token seguía sirviendo
+// hasta su vencimiento aunque el usuario cerrara sesión.
+router.post("/logout", autenticar, async (req, res) => {
+  try {
+    const { jti, exp, usuarioId, nombreUsuario } = req.usuario;
+    await pool.query(
+      "INSERT INTO tokens_revocados (jti, usuario_id, expira_en) VALUES ($1, $2, to_timestamp($3)) ON CONFLICT (jti) DO NOTHING",
+      [jti, usuarioId, exp]
+    );
+    // Limpieza de revocaciones que ya vencieron (no necesitan seguir guardadas)
+    await pool.query("DELETE FROM tokens_revocados WHERE expira_en < now()");
+    await pool.query("INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)", [
+      nombreUsuario,
+      "LOGOUT: usuario cerró sesión",
+    ]);
+    res.status(204).end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error al cerrar sesión" });
   }
 });
 

@@ -68,7 +68,13 @@ export default function AuthProvider({ children }) {
     }
   };
 
-  const logout = () => {
+  // DEF-07: el cierre de sesión revoca el token en el servidor antes de borrarlo.
+  const logout = async () => {
+    try {
+      if (localStorage.getItem("token")) await api.post("/autenticacion/logout");
+    } catch {
+      // Si el servidor no responde, igual se elimina la sesión local.
+    }
     setToken(null);
     setUser(null);
     setRole(null);

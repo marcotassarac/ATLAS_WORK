@@ -19,7 +19,12 @@ async function autenticar(req, res, next) {
     return noAutorizado(res, "La sesión no es válida o expiró.");
   }
   if (!datos.usuarioId || !datos.empresaId) return noAutorizado(res, "La sesión no tiene una empresa asociada.");
+  if (!datos.jti) return noAutorizado(res, "La sesión no es válida o expiró.");
   try {
+    // DEF-07: un token revocado al cerrar sesión deja de aceptarse de inmediato (RF-1.2)
+    const revocado = await pool.query("SELECT 1 FROM tokens_revocados WHERE jti = $1", [datos.jti]);
+    if (revocado.rows.length) return noAutorizado(res, "La sesión fue cerrada.");
+
     // DEF-05: pertenencia y rol vigentes. Si el usuario fue eliminado de la empresa
     // o su rol cambió, el cambio aplica de inmediato aunque el token siga vigente.
     const { rows } = await pool.query(
@@ -36,6 +41,8 @@ async function autenticar(req, res, next) {
       empresaId: Number(datos.empresaId),
       empresaUsuarioId: Number(rows[0].id),
       rol: rows[0].rol,
+      jti: datos.jti,
+      exp: datos.exp,
     };
     return next();
   } catch (err) {
