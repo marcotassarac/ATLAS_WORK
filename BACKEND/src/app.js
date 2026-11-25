@@ -16,6 +16,7 @@ const empresaUsuariosRoutes = require("./routes/empresa_usuarios");
 const metricasRoutes = require("./routes/metricas");
 const registroRoutes = require("./routes/registro");
 const { autenticar } = require("./middleware/autenticacion");
+const { limiteRegistro } = require("./middleware/limites");
 
 const app = express();
 
@@ -25,7 +26,7 @@ app.use(morgan("dev"));
 
 // Rutas públicas: inicio de sesión, registro y estado del servicio.
 app.use("/autenticacion", authRoutes);
-app.use("/registro", registroRoutes);
+app.use("/registro", limiteRegistro, registroRoutes);
 app.get("/", (req, res) => {
   res.json({ name: "Atlas", status: "ok" });
 });

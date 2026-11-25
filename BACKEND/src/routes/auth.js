@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const { pool } = require("../db");
 const { verificar } = require("../seguridad/contrasenas");
 const { autenticar } = require("../middleware/autenticacion");
+const { limiteLoginPorIp, limiteLoginPorUsuario } = require("../middleware/limites");
 
 const router = express.Router();
 
@@ -11,7 +12,7 @@ const { JWT_SECRET } = require("../config");
 
 
 // Inicio de sesión. DEF-03: la contraseña se compara contra su hash bcrypt.
-router.post("/login", async (req, res) => {
+router.post("/login", limiteLoginPorIp, limiteLoginPorUsuario, async (req, res) => {
   const { nombre_usuario, password } = req.body;
   try {
     const result = await pool.query(
