@@ -2,26 +2,13 @@ const path = require("path");
 const fs = require("fs");
 const express = require("express");
 const multer = require("multer");
-const jwt = require("jsonwebtoken");
 const { pool } = require("../db");
 
 const router = express.Router();
-const { JWT_SECRET } = require("../config");
 
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
-
-function getUserFromAuthHeader(req) {
-  const auth = req.headers.authorization || "";
-  if (!auth.startsWith("Bearer ")) return null;
-  try {
-    const token = auth.substring(7);
-    return jwt.verify(token, JWT_SECRET);
-  } catch {
-    return null;
-  }
-}
 
 // Crear contrato con archivo PDF (guardado en DB como bytea)
 router.post("/", upload.single("file"), async (req, res) => {
@@ -47,11 +34,11 @@ router.post("/", upload.single("file"), async (req, res) => {
     }
 
     const result = contractInsert;
-    const authUser = getUserFromAuthHeader(req);
+    const authUser = req.usuario;
     await pool.query(
       "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
       [
-        authUser?.nombreUsuario || null,
+        authUser.nombreUsuario,
         `CONTRATOS_CREAR: creó contrato ${titulo} para cliente ${cliente_id}`,
       ]
     );
@@ -69,14 +56,7 @@ router.post("/", upload.single("file"), async (req, res) => {
 // Listar contratos
 router.get("/", async (req, res) => {
   try {
-    const authUser = getUserFromAuthHeader(req);
-
-    if (!authUser || !authUser.empresaId) {
-      return res.status(401).json({
-        error: "No autorizado",
-        glosa: "Token inválido o sin empresa asociada",
-      });
-    }
+    const authUser = req.usuario;
     const empresaId = authUser.empresaId;
     const result = await pool.query(
       `
@@ -108,15 +88,7 @@ router.get("/", async (req, res) => {
 // Servicio 1: Contratos por estado (por_vencer y vencido)
 router.get("/estados", async (req, res) => {
   try {
-    const authUser = getUserFromAuthHeader(req);
-
-    // Validar token y empresaId
-    if (!authUser || !authUser.empresaId) {
-      return res.status(401).json({
-        error: "No autorizado",
-        glosa: "Token inválido o sin empresa asociada",
-      });
-    }
+    const authUser = req.usuario;
 
     const empresaId = authUser.empresaId;
     const hoy = new Date();
@@ -174,15 +146,7 @@ router.get("/estados", async (req, res) => {
 // Servicio 2: Dashboard con estadísticas de la empresa
 router.get("/dashboard", async (req, res) => {
   try {
-    const authUser = getUserFromAuthHeader(req);
-
-    // Validar token y empresaId
-    if (!authUser || !authUser.empresaId) {
-      return res.status(401).json({
-        error: "No autorizado",
-        glosa: "Token inválido o sin empresa asociada",
-      });
-    }
+    const authUser = req.usuario;
 
     const empresaId = authUser.empresaId;
     const hoy = new Date();
@@ -289,15 +253,7 @@ router.get("/:id", async (req, res) => {
 // Actualizar contrato
 router.put("/:id", upload.single("file"), async (req, res) => {
   try {
-    const authUser = getUserFromAuthHeader(req);
-
-    // Validar token y empresaId
-    if (!authUser || !authUser.empresaId) {
-      return res.status(401).json({
-        error: "No autorizado",
-        glosa: "Token inválido o sin empresa asociada",
-      });
-    }
+    const authUser = req.usuario;
 
     const empresaId = authUser.empresaId;
     const contratoId = req.params.id;
@@ -388,7 +344,7 @@ router.put("/:id", upload.single("file"), async (req, res) => {
     await pool.query(
       "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
       [
-        authUser?.nombreUsuario || null,
+        authUser.nombreUsuario,
         `CONTRATOS_ACTUALIZAR: actualizó contrato ID ${contratoId} - ${
           titulo || contratoExistente.rows[0].titulo
         }`,
@@ -440,11 +396,11 @@ router.delete("/:id", async (req, res) => {
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });
 
-    const authUser = getUserFromAuthHeader(req);
+    const authUser = req.usuario;
     await pool.query(
       "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
       [
-        authUser?.nombreUsuario || null,
+        authUser.nombreUsuario,
         `CONTRATOS_ELIMINAR: eliminó contrato ID ${req.params.id}`,
       ]
     );

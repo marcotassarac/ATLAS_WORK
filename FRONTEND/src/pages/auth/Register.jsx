@@ -54,7 +54,7 @@ export default function Register() {
         },
       };
 
-      await api.post("/empresas", payload);
+      await api.post("/registro", payload);
       toast.success("Cuenta creada exitosamente, ahora inicia sesión");
       navigate("/login");
     } catch {

@@ -1,34 +1,13 @@
 const express = require("express");
 const { pool } = require("../db");
 const { erroresPolitica, mensajePolitica, hashear } = require("../seguridad/contrasenas");
-const jwt = require("jsonwebtoken");
 
 const router = express.Router();
-const { JWT_SECRET } = require("../config");
-
-function getUserFromAuthHeader(req) {
-  const auth = req.headers.authorization || "";
-  if (!auth.startsWith("Bearer ")) return null;
-  try {
-    const token = auth.substring(7);
-    return jwt.verify(token, JWT_SECRET);
-  } catch {
-    return null;
-  }
-}
 
 // Crear relación empresa-usuario con rol (crea usuario si no existe)
 router.post("/", async (req, res) => {
   try {
-    const authUser = getUserFromAuthHeader(req);
-
-    // Validar token y empresaId
-    if (!authUser || !authUser.empresaId) {
-      return res.status(401).json({
-        error: "No autorizado",
-        glosa: "Token inválido o sin empresa asociada",
-      });
-    }
+    const authUser = req.usuario;
 
     const empresaId = authUser.empresaId;
     let usuarioId;
@@ -75,7 +54,7 @@ router.post("/", async (req, res) => {
     await pool.query(
       "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
       [
-        authUser?.nombreUsuario || null,
+        authUser.nombreUsuario,
         `EMPRESA_USUARIOS_CREAR: vinculó usuario ${usuarioId} a empresa ${empresaId} con rol ${rol_id}`,
       ]
     );
@@ -93,15 +72,7 @@ router.post("/", async (req, res) => {
 // Listar usuarios de la empresa (filtrado por empresa del token)
 router.get("/", async (req, res) => {
   try {
-    const authUser = getUserFromAuthHeader(req);
-
-    // Validar token y empresaId
-    if (!authUser || !authUser.empresaId) {
-      return res.status(401).json({
-        error: "No autorizado",
-        glosa: "Token inválido o sin empresa asociada",
-      });
-    }
+    const authUser = req.usuario;
 
     const empresaId = authUser.empresaId;
 
@@ -164,11 +135,11 @@ router.put("/:id", async (req, res) => {
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });
 
-    const authUser = getUserFromAuthHeader(req);
+    const authUser = req.usuario;
     await pool.query(
       "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
       [
-        authUser?.nombreUsuario || null,
+        authUser.nombreUsuario,
         `EMPRESA_USUARIOS_ACTUALIZAR: actualizó vínculo ID ${req.params.id}`,
       ]
     );
@@ -193,11 +164,11 @@ router.delete("/:id", async (req, res) => {
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });
 
-    const authUser = getUserFromAuthHeader(req);
+    const authUser = req.usuario;
     await pool.query(
       "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
       [
-        authUser?.nombreUsuario || null,
+        authUser.nombreUsuario,
         `EMPRESA_USUARIOS_ELIMINAR: eliminó vínculo ID ${req.params.id}`,
       ]
     );

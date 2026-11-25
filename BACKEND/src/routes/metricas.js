@@ -1,21 +1,8 @@
 const express = require("express");
-const jwt = require("jsonwebtoken");
 const { pool } = require("../db");
 
 const router = express.Router();
-const { JWT_SECRET } = require("../config");
 
-
-function getUserFromAuthHeader(req) {
-  const auth = req.headers.authorization || "";
-  if (!auth.startsWith("Bearer ")) return null;
-  try {
-    const token = auth.substring(7);
-    return jwt.verify(token, JWT_SECRET);
-  } catch {
-    return null;
-  }
-}
 
 // Función auxiliar para calcular días entre dos fechas
 // Retorna la diferencia en días (puede ser positiva o negativa)
@@ -33,15 +20,7 @@ function calcularDiasEntreFechas(fecha1, fecha2) {
 // Endpoint de métricas
 router.get("/", async (req, res) => {
   try {
-    const authUser = getUserFromAuthHeader(req);
-
-    // Validar token y empresaId
-    if (!authUser || !authUser.empresaId) {
-      return res.status(401).json({
-        error: "No autorizado",
-        glosa: "Token inválido o sin empresa asociada",
-      });
-    }
+    const authUser = req.usuario;
 
     const empresaId = authUser.empresaId;
     const hoy = new Date();

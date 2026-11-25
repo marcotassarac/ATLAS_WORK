@@ -23,11 +23,8 @@ api.interceptors.request.use(
 
     // Rutas públicas que no requieren token
     const isLogin = url.includes("/autenticacion/login");
-    // El registro es POST a /empresas cuando no hay token (usuario nuevo)
-    const isRegister =
-      url.includes("/empresas") &&
-      config.method?.toLowerCase() === "post" &&
-      !token;
+    // El registro público es POST a /registro
+    const isRegister = url.includes("/registro");
 
     // Si no es login ni registro, agregar el token si existe
     if (!isLogin && !isRegister && token) {
@@ -82,3 +79,18 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// DEF-04: los documentos se descargan con el token de sesión (antes eran enlaces
+// públicos sin autenticación). Se abre el archivo en una pestaña nueva.
+export async function abrirDocumentoContrato(id) {
+  const ventana = window.open("", "_blank");
+  try {
+    const { data, headers } = await api.get(`/contratos/${id}/file`, { responseType: "blob" });
+    const url = URL.createObjectURL(new Blob([data], { type: headers["content-type"] || "application/pdf" }));
+    if (ventana) ventana.location.href = url;
+    else window.location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch {
+    if (ventana) ventana.close();
+  }
+}

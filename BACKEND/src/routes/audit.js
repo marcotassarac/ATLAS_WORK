@@ -1,30 +1,17 @@
 const express = require("express");
 const { pool } = require("../db");
-const jwt = require("jsonwebtoken");
 
 const router = express.Router();
-const { JWT_SECRET } = require("../config");
-
-function getUserFromAuthHeader(req) {
-  const auth = req.headers.authorization || "";
-  if (!auth.startsWith("Bearer ")) return null;
-  try {
-    const token = auth.substring(7);
-    return jwt.verify(token, JWT_SECRET);
-  } catch {
-    return null;
-  }
-}
 
 // Registrar log manualmente
 router.post("/", async (req, res) => {
   const { accion, detalles } = req.body;
   try {
-    const authUser = getUserFromAuthHeader(req);
+    const authUser = req.usuario;
     const actionText = detalles ? `${accion}: ${detalles}` : accion;
     const result = await pool.query(
       "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2) RETURNING *",
-      [authUser?.nombreUsuario || null, actionText]
+      [authUser.nombreUsuario, actionText]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {

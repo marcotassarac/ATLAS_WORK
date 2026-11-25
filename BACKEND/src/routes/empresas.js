@@ -1,96 +1,36 @@
 const express = require("express");
 const { pool } = require("../db");
-const { erroresPolitica, mensajePolitica, hashear } = require("../seguridad/contrasenas");
-const jwt = require("jsonwebtoken");
 
 const router = express.Router();
-const { JWT_SECRET } = require("../config");
 
-function getUserFromAuthHeader(req) {
-  const auth = req.headers.authorization || "";
-  if (!auth.startsWith("Bearer ")) return null;
-  try {
-    const token = auth.substring(7);
-    return jwt.verify(token, JWT_SECRET);
-  } catch {
-    return null;
-  }
-}
-
-// Crear empresa (con usuario y relación)
+// Crear empresa adicional (usuario autenticado). El registro público está en /registro.
 router.post("/", async (req, res) => {
-  // Verificar si viene el formato nuevo con usuario y empresa
-  if (req.body.usuario && req.body.empresa) {
-    const { usuario, empresa } = req.body;
-    const { nombre_usuario, contrasena_hash, correo: correoUsuario } = usuario;
-    const { nombre, direccion = null, telefono = null, correo } = empresa;
+  // Formato anterior: solo crear empresa
+  const { nombre, direccion = null, telefono = null, correo } = req.body;
+  try {
+    const result = await pool.query(
+      "INSERT INTO empresas (nombre, direccion, telefono, correo) VALUES ($1, $2, $3, $4) RETURNING *",
+      [nombre, direccion, telefono, correo]
+    );
 
-    try {
-      const erroresClave = erroresPolitica(contrasena_hash);
-      if (erroresClave.length) {
-        return res.status(400).json({ error: "Contraseña insegura", glosa: mensajePolitica(erroresClave) });
-      }
-      // 1. Crear usuario
-      const usuarioResult = await pool.query(
-        "INSERT INTO usuarios (nombre_usuario, contrasena_hash, correo) VALUES ($1, $2, $3) RETURNING id, nombre_usuario, correo, created_at",
-        [nombre_usuario, await hashear(contrasena_hash), correoUsuario]
-      );
-      const usuarioId = usuarioResult.rows[0].id;
+    const authUser = req.usuario;
+    await pool.query(
+      "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
+      [
+        authUser.nombreUsuario,
+        `EMPRESAS_CREAR: creó empresa ${nombre}`,
+      ]
+    );
 
-      // 2. Crear empresa
-      const empresaResult = await pool.query(
-        "INSERT INTO empresas (nombre, direccion, telefono, correo) VALUES ($1, $2, $3, $4) RETURNING *",
-        [nombre, direccion, telefono, correo]
-      );
-      const empresaId = empresaResult.rows[0].id;
-
-      // 3. Crear relación empresa-usuario con rol administrador (ID 1)
-      await pool.query(
-        "INSERT INTO empresa_usuarios (empresa_id, usuario_id, rol_id) VALUES ($1, $2, $3) RETURNING *",
-        [empresaId, usuarioId, 1]
-      );
-
-      res.status(201).json({
-        usuario: usuarioResult.rows[0],
-        empresa: empresaResult.rows[0],
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res
+      .status(500)
+      .json({
+        error: "Error al crear empresa",
+        glosa: err.message || err.toString(),
       });
-    } catch (err) {
-      console.error(err);
-      res
-        .status(500)
-        .json({
-          error: "Error al crear empresa con usuario",
-          glosa: err.message || err.toString(),
-        });
-    }
-  } else {
-    // Formato anterior: solo crear empresa
-    const { nombre, direccion = null, telefono = null, correo } = req.body;
-    try {
-      const result = await pool.query(
-        "INSERT INTO empresas (nombre, direccion, telefono, correo) VALUES ($1, $2, $3, $4) RETURNING *",
-        [nombre, direccion, telefono, correo]
-      );
-
-      const authUser = getUserFromAuthHeader(req);
-      await pool.query(
-        "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
-        [
-          authUser?.nombreUsuario || null,
-          `EMPRESAS_CREAR: creó empresa ${nombre}`,
-        ]
-      );
-
-      res.status(201).json(result.rows[0]);
-    } catch (err) {
-      console.error(err);
-      res
-        .status(500)
-        .json({
-          error: "Error al crear empresa",
-          glosa: err.message || err.toString(),
-        });
-    }
   }
 });
 
@@ -141,11 +81,11 @@ router.put("/:id", async (req, res) => {
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });
 
-    const authUser = getUserFromAuthHeader(req);
+    const authUser = req.usuario;
     await pool.query(
       "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
       [
-        authUser?.nombreUsuario || null,
+        authUser.nombreUsuario,
         `EMPRESAS_ACTUALIZAR: actualizó empresa ID ${req.params.id}`,
       ]
     );
@@ -172,11 +112,11 @@ router.delete("/:id", async (req, res) => {
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });
 
-    const authUser = getUserFromAuthHeader(req);
+    const authUser = req.usuario;
     await pool.query(
       "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
       [
-        authUser?.nombreUsuario || null,
+        authUser.nombreUsuario,
         `EMPRESAS_ELIMINAR: eliminó empresa ID ${req.params.id}`,
       ]
     );

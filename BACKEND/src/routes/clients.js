@@ -1,21 +1,8 @@
 const express = require("express");
 const { pool } = require("../db");
-const jwt = require("jsonwebtoken");
 
 const router = express.Router();
-const { JWT_SECRET } = require("../config");
 
-
-function getUserFromAuthHeader(req) {
-  const auth = req.headers.authorization || "";
-  if (!auth.startsWith("Bearer ")) return null;
-  try {
-    const token = auth.substring(7);
-    return jwt.verify(token, JWT_SECRET);
-  } catch {
-    return null;
-  }
-}
 
 // Crear cliente (empresa)
 router.post("/", async (req, res) => {
@@ -53,15 +40,7 @@ router.post("/", async (req, res) => {
 
   try {
     // Obtener empresa_id del token
-    const authUser = getUserFromAuthHeader(req);
-
-    // Validar que exista el token y el empresaId
-    if (!authUser || !authUser.empresaId) {
-      return res.status(401).json({
-        error: "No autorizado",
-        glosa: "Token inválido o sin empresa asociada",
-      });
-    }
+    const authUser = req.usuario;
 
     const empresaId = authUser.empresaId;
 
@@ -107,7 +86,7 @@ router.post("/", async (req, res) => {
     await pool.query(
       "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
       [
-        authUser?.nombreUsuario || null,
+        authUser.nombreUsuario,
         `CLIENTES_CREAR: creó cliente ${nombre}`,
       ]
     );
@@ -125,15 +104,7 @@ router.post("/", async (req, res) => {
 // Listar clientes filtrados por empresa del token
 router.get("/", async (req, res) => {
   try {
-    const authUser = getUserFromAuthHeader(req);
-
-    // Si no hay token o no hay empresaId, retornar error
-    if (!authUser || !authUser.empresaId) {
-      return res.status(401).json({
-        error: "No autorizado",
-        glosa: "Token inválido o sin empresa asociada",
-      });
-    }
+    const authUser = req.usuario;
 
     console.log("authUser", authUser.empresaId);
 
@@ -157,15 +128,7 @@ router.get("/", async (req, res) => {
 router.get("/search", async (req, res) => {
   const { name } = req.query;
   try {
-    const authUser = getUserFromAuthHeader(req);
-
-    // Si no hay token o no hay empresaId, retornar error
-    if (!authUser || !authUser.empresaId) {
-      return res.status(401).json({
-        error: "No autorizado",
-        glosa: "Token inválido o sin empresa asociada",
-      });
-    }
+    const authUser = req.usuario;
 
     const result = await pool.query(
       "SELECT * FROM clientes WHERE nombre ILIKE $1 AND empresa_id = $2 ORDER BY nombre ASC",
@@ -184,15 +147,7 @@ router.get("/search", async (req, res) => {
 // Obtener cliente por id (validando que pertenezca a la empresa del token)
 router.get("/:id", async (req, res) => {
   try {
-    const authUser = getUserFromAuthHeader(req);
-
-    // Si no hay token o no hay empresaId, retornar error
-    if (!authUser || !authUser.empresaId) {
-      return res.status(401).json({
-        error: "No autorizado",
-        glosa: "Token inválido o sin empresa asociada",
-      });
-    }
+    const authUser = req.usuario;
 
     const result = await pool.query(
       "SELECT * FROM clientes WHERE id=$1 AND empresa_id = $2",
@@ -247,15 +202,7 @@ router.put("/:id", async (req, res) => {
   } = req.body;
 
   try {
-    const authUser = getUserFromAuthHeader(req);
-
-    // Si no hay token o no hay empresaId, retornar error
-    if (!authUser || !authUser.empresaId) {
-      return res.status(401).json({
-        error: "No autorizado",
-        glosa: "Token inválido o sin empresa asociada",
-      });
-    }
+    const authUser = req.usuario;
 
     // Actualizar cliente validando que pertenezca a la empresa del token
     // El empresa_id se mantiene del token, no se puede cambiar desde el body
@@ -304,7 +251,7 @@ router.put("/:id", async (req, res) => {
     await pool.query(
       "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
       [
-        authUser?.nombreUsuario || null,
+        authUser.nombreUsuario,
         `CLIENTES_ACTUALIZAR: actualizó cliente ID ${req.params.id}`,
       ]
     );
@@ -322,15 +269,7 @@ router.put("/:id", async (req, res) => {
 // Eliminar cliente (validando que pertenezca a la empresa del token)
 router.delete("/:id", async (req, res) => {
   try {
-    const authUser = getUserFromAuthHeader(req);
-
-    // Si no hay token o no hay empresaId, retornar error
-    if (!authUser || !authUser.empresaId) {
-      return res.status(401).json({
-        error: "No autorizado",
-        glosa: "Token inválido o sin empresa asociada",
-      });
-    }
+    const authUser = req.usuario;
 
     // Eliminar cliente validando que pertenezca a la empresa del token
     const result = await pool.query(
@@ -344,7 +283,7 @@ router.delete("/:id", async (req, res) => {
     await pool.query(
       "INSERT INTO auditoria (usuario_id, accion) VALUES ($1, $2)",
       [
-        authUser?.nombreUsuario || null,
+        authUser.nombreUsuario,
         `CLIENTES_ELIMINAR: eliminó cliente ID ${req.params.id}`,
       ]
     );

@@ -227,6 +227,14 @@ def login(usuario, clave):
     return r, token
 
 
+def registrar(datos):
+    """Registro público. Desde la v1.4 la ruta es POST /registro; en la v1.0 era POST /empresas."""
+    r = http("POST", "/registro", datos)
+    if r.status == 404:
+        r = http("POST", "/empresas", datos)
+    return r
+
+
 PDF = (b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
        b"2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n")
 EXE = b"MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xff\xff" + b"\x00" * 200
@@ -312,7 +320,7 @@ def preparar():
         raise RuntimeError(f"No fue posible iniciar sesion como admin: {CTX.r_admin.status} {CTX.r_admin.texto()}")
     # Empresa B (segundo inquilino) creada por el registro publico
     CTX.usuario_b = f"adminb_{SFX}"
-    reg = http("POST", "/empresas", {
+    reg = registrar({
         "usuario": {"nombre_usuario": CTX.usuario_b, "contrasena_hash": CLAVE_FUERTE,
                     "correo": f"adminb_{SFX}@prueba.cl"},
         "empresa": {"nombre": f"Empresa B {SFX}", "direccion": "Calle Falsa 123",
@@ -471,13 +479,13 @@ def cp09(c):
                f"JOIN roles r ON r.id = eu.rol_id WHERE u.nombre_usuario = '{CTX.usuario_b}'")
     c.paso("El primer usuario de la empresa obtiene el rol administrador", rol == "administrador",
            obtenido=f"rol asignado: «{rol}»")
-    r = http("POST", "/empresas", {
+    r = registrar({
         "usuario": {"nombre_usuario": f"debil_{SFX}", "contrasena_hash": "123", "correo": f"debil_{SFX}@prueba.cl"},
         "empresa": {"nombre": f"Empresa Débil {SFX}", "correo": f"debil_emp_{SFX}@prueba.cl"},
         "acepta_politica": True})
     c.paso("Contraseña débil («123») se rechaza con 400", r.status == 400, r)
     antes = psql("SELECT count(*) FROM usuarios")
-    r = http("POST", "/empresas", {
+    r = registrar({
         "usuario": {"nombre_usuario": f"dup_{SFX}", "contrasena_hash": CLAVE_FUERTE, "correo": f"dup_{SFX}@prueba.cl"},
         "empresa": {"nombre": "Empresa duplicada", "correo": f"empresab_{SFX}@prueba.cl"},
         "acepta_politica": True})
@@ -683,7 +691,7 @@ def cp16(c):
       "Cumplimiento normativo", "El servidor exige la aceptación de la política de privacidad para registrar datos personales (400 sin ella); "
       "la política es accesible.", owasp="Ley 21.719 art. 12 (consentimiento)")
 def cp20(c):
-    r = http("POST", "/empresas", {
+    r = registrar({
         "usuario": {"nombre_usuario": f"sinconsent_{SFX}", "contrasena_hash": CLAVE_FUERTE, "correo": f"sinconsent_{SFX}@prueba.cl"},
         "empresa": {"nombre": f"Empresa sin consentimiento {SFX}", "correo": f"sinconsent_emp_{SFX}@prueba.cl"}})
     c.paso("Registro sin aceptar la política de privacidad se rechaza (400)", r.status == 400, r)

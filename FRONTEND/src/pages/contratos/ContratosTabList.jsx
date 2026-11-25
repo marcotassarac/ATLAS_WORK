@@ -25,6 +25,7 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { useAuth } from "../../hooks/useAuth";
+import { abrirDocumentoContrato } from "../../lib/api";
 
 export default function ContratosTabList({
   items,
@@ -32,7 +33,6 @@ export default function ContratosTabList({
   onLoad,
   loading = false,
 }) {
-  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:4450";
   const navigate = useNavigate();
   const { role } = useAuth();
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
@@ -169,9 +169,9 @@ export default function ContratosTabList({
         size: 150,
         Cell: ({ row }) => (
           <MLink
-            href={`${apiUrl}/contratos/${row.original.id}/file`}
-            target="_blank"
-            rel="noreferrer"
+            component="button"
+            type="button"
+            onClick={() => abrirDocumentoContrato(row.original.id)}
             sx={{
               display: "inline-flex",
               alignItems: "center",
