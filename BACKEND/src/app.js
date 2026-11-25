@@ -48,7 +48,7 @@ app.get("/", (req, res) => {
   res.json({ name: "Atlas", status: "ok" });
 });
 
-const PORT = process.env.PORT || 3000;
+const { PORT } = require("./config");
 app.listen(PORT, () => {
   console.log(`Atlas API escuchando en puerto ${PORT}`);
 });

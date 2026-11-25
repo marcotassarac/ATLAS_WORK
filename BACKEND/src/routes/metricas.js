@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const { pool } = require("../db");
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || "inseguro";
+const { JWT_SECRET } = require("../config");
 
 // Función helper para simular latencia
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));

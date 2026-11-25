@@ -1,2 +1,21 @@
-BACKEND/node_modules
-FRONTEND/node_modules
+# Dependencias y artefactos
+node_modules/
+dist/
+build/
+coverage/
+.scannerwork/
+*.log
+
+# DEF-01: secretos y configuración local. Nunca se versionan.
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+certs/
+*.pem
+*.key
+
+# Archivos subidos por usuarios
+BACKEND/uploads/

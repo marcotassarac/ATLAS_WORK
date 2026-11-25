@@ -1,10 +1,7 @@
 const { Pool } = require("pg");
-require("dotenv").config();
+const { DATABASE_URL } = require("./config");
 
-const connectionString =
-  process.env.DATABASE_URL ||
-  "postgres://postgres:alone15@localhost:5432/atlas";
-
-const pool = new Pool({ connectionString });
+// DEF-01: la cadena de conexión ya no tiene un valor por defecto con credenciales.
+const pool = new Pool({ connectionString: DATABASE_URL });
 
 module.exports = { pool };
