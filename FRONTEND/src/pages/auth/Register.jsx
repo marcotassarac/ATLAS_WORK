@@ -41,6 +41,7 @@ export default function Register() {
 
       // Estructurar los datos según el formato requerido
       const payload = {
+        acepta_politica: userData.acepta_politica === true,
         usuario: {
           nombre_usuario: userData.nombre_usuario,
           contrasena_hash: userData.contrasena_hash,
@@ -168,9 +169,37 @@ export default function Register() {
                   type="password"
                   data-testid="input-registro-password"
                   {...userForm.register("contrasena_hash", { required: true })}
+                  aria-describedby="ayuda-contrasena"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent hover:border-secondary transition-colors"
                 />
+                <p id="ayuda-contrasena" className="text-sm text-gray-700 mt-1">
+                  Mínimo 12 caracteres, con mayúscula, minúscula, número y símbolo.
+                </p>
               </div>
+
+              {/* DEF-13: aviso de privacidad y consentimiento expreso (Ley 19.628 y Ley 21.719) */}
+              <div className="flex items-start gap-3">
+                <input
+                  id="acepta_politica"
+                  type="checkbox"
+                  data-testid="checkbox-registro-politica"
+                  {...userForm.register("acepta_politica", { required: true })}
+                  className="mt-1 h-5 w-5 accent-primary"
+                />
+                <label htmlFor="acepta_politica" className="text-sm text-gray-800">
+                  He leído y acepto la{" "}
+                  <Link to="/privacidad" target="_blank" className="text-primary font-semibold underline">
+                    política de privacidad
+                  </Link>
+                  . Atlas tratará mis datos personales y los de mi empresa solo para prestar el servicio, conforme a
+                  las leyes N.° 19.628 y N.° 21.719.
+                </label>
+              </div>
+              {userForm.formState.errors.acepta_politica && (
+                <p role="alert" className="text-sm text-red-700">
+                  Debe aceptar la política de privacidad para continuar.
+                </p>
+              )}
 
               <button
                 type="submit"

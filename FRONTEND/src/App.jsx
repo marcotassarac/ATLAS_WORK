@@ -14,6 +14,7 @@ import ContratoForm from "./pages/contratos/ContratoForm";
 import ContratoDetalle from "./pages/contratos/ContratoDetalle";
 import AuditoriaList from "./pages/auditoria/AuditoriaList";
 import Home from "./pages/Home";
+import Privacidad from "./pages/legal/Privacidad";
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
       <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/registro" element={<Register />} />
+      <Route path="/privacidad" element={<Privacidad />} />
       <Route
         element={
           <RequireAuth>
