@@ -5,8 +5,6 @@ const jwt = require("jsonwebtoken");
 const router = express.Router();
 const { JWT_SECRET } = require("../config");
 
-// Función helper para simular latencia
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 function getUserFromAuthHeader(req) {
   const auth = req.headers.authorization || "";
@@ -127,8 +125,6 @@ router.post("/", async (req, res) => {
 // Listar clientes filtrados por empresa del token
 router.get("/", async (req, res) => {
   try {
-    // Simular latencia de 4 segundos
-    await delay(4000);
     const authUser = getUserFromAuthHeader(req);
 
     // Si no hay token o no hay empresaId, retornar error

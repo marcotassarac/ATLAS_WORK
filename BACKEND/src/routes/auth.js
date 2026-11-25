@@ -6,15 +6,11 @@ const router = express.Router();
 
 const { JWT_SECRET } = require("../config");
 
-// Función helper para simular latencia
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Login simple: usuario + contraseña en texto plano
 router.post("/login", async (req, res) => {
   const { nombre_usuario, password } = req.body;
   try {
-    // Simular latencia de 4 segundos
-    await delay(4000);
     const result = await pool.query(
       "SELECT id, nombre_usuario, contrasena_hash FROM usuarios WHERE nombre_usuario = $1",
       [nombre_usuario]

@@ -8,8 +8,6 @@ const { pool } = require("../db");
 const router = express.Router();
 const { JWT_SECRET } = require("../config");
 
-// Función helper para simular latencia
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -71,8 +69,6 @@ router.post("/", upload.single("file"), async (req, res) => {
 // Listar contratos
 router.get("/", async (req, res) => {
   try {
-    // Simular latencia de 4 segundos
-    await delay(4000);
     const authUser = getUserFromAuthHeader(req);
 
     if (!authUser || !authUser.empresaId) {
