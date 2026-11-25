@@ -5,34 +5,16 @@ const { erroresPolitica, mensajePolitica, hashear } = require("../seguridad/cont
 
 const router = express.Router();
 
-// Crear usuario
-router.post("/", soloAdministrador, async (req, res) => {
-  const { nombre_usuario, contrasena_hash, correo } = req.body;
-  try {
-    const erroresClave = erroresPolitica(contrasena_hash);
-    if (erroresClave.length) {
-      return res.status(400).json({ error: "Contraseña insegura", glosa: mensajePolitica(erroresClave) });
-    }
-    const result = await pool.query(
-      "INSERT INTO usuarios (nombre_usuario, contrasena_hash, correo) VALUES ($1, $2, $3) RETURNING id, nombre_usuario, correo, created_at",
-      [nombre_usuario, await hashear(contrasena_hash), correo]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al crear usuario",
-      glosa: err.message || err.toString(),
-    });
-  }
-});
+// DEF-06: se elimina POST /usuarios, que creaba cuentas sin empresa. Los usuarios
+// se crean dentro de la empresa con POST /empresa-usuarios.
+
+// Condición reutilizable: el usuario pertenece a la empresa de la sesión
+const EN_MI_EMPRESA = "EXISTS (SELECT 1 FROM empresa_usuarios eu WHERE eu.usuario_id = usuarios.id AND eu.empresa_id = $EMP)";
 
 // Listar usuarios filtrados por empresa del token
 router.get("/", async (req, res) => {
   try {
     const authUser = req.usuario;
-    console.log("authUser", authUser);
-    /* console.log("authUser.empresaId", authUser.empresaId); */
 
     // Filtrar usuarios que pertenecen a la empresa del token
     const result = await pool.query(
@@ -58,8 +40,8 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT id, nombre_usuario, correo, created_at FROM usuarios WHERE id = $1",
-      [req.params.id]
+      `SELECT id, nombre_usuario, correo, created_at FROM usuarios WHERE id = $1 AND ${EN_MI_EMPRESA.replace("$EMP", "$2")}`,
+      [req.params.id, req.usuario.empresaId]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });
@@ -82,8 +64,9 @@ router.put("/:id", soloAdministrador, async (req, res) => {
       return res.status(400).json({ error: "Contraseña insegura", glosa: mensajePolitica(erroresClave) });
     }
     const result = await pool.query(
-      "UPDATE usuarios SET nombre_usuario=$1, contrasena_hash=COALESCE($2, contrasena_hash), correo=$3 WHERE id=$4 RETURNING id, nombre_usuario, correo, created_at",
-      [nombre_usuario, contrasena_hash === undefined ? null : await hashear(contrasena_hash), correo, req.params.id]
+      `UPDATE usuarios SET nombre_usuario=$1, contrasena_hash=COALESCE($2, contrasena_hash), correo=$3
+        WHERE id=$4 AND ${EN_MI_EMPRESA.replace("$EMP", "$5")} RETURNING id, nombre_usuario, correo, created_at`,
+      [nombre_usuario, contrasena_hash === undefined ? null : await hashear(contrasena_hash), correo, req.params.id, req.usuario.empresaId]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });
@@ -111,8 +94,8 @@ router.put("/:id", soloAdministrador, async (req, res) => {
 router.delete("/:id", soloAdministrador, async (req, res) => {
   try {
     const result = await pool.query(
-      "DELETE FROM usuarios WHERE id=$1 RETURNING *",
-      [req.params.id]
+      `DELETE FROM usuarios WHERE id=$1 AND ${EN_MI_EMPRESA.replace("$EMP", "$2")} RETURNING id`,
+      [req.params.id, req.usuario.empresaId]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });

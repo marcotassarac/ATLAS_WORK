@@ -24,10 +24,10 @@ router.post("/", soloAdministrador, async (req, res) => {
       return res.status(400).json({ error: "Datos inválidos", glosa: "El rol indicado no existe." });
     }
 
-    // Si viene usuario_id, usar ese (compatibilidad con formato anterior)
-    // Si vienen datos del usuario, crear el usuario primero
+    // DEF-06: ya no se acepta usuario_id. Vincular un usuario existente por su id
+    // permitía incorporar (y ver) cuentas de otras empresas.
     if (usuario_id) {
-      usuarioId = usuario_id;
+      return res.status(400).json({ error: "Datos inválidos", glosa: "Solo se pueden crear usuarios nuevos para la empresa." });
     } else if (nombre_usuario && contrasena_hash && correo) {
       // Crear usuario primero (DEF-03: política de contraseñas y hash bcrypt)
       const erroresClave = erroresPolitica(contrasena_hash);
@@ -119,8 +119,8 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT * FROM empresa_usuarios WHERE id=$1",
-      [req.params.id]
+      "SELECT * FROM empresa_usuarios WHERE id=$1 AND empresa_id=$2",
+      [req.params.id, req.usuario.empresaId]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });
@@ -136,7 +136,8 @@ router.get("/:id", async (req, res) => {
 
 // Actualizar vínculo
 router.put("/:id", soloAdministrador, async (req, res) => {
-  const { empresa_id, usuario_id, rol_id } = req.body;
+  // DEF-06: solo se puede cambiar el rol; la empresa y el usuario del vínculo no se modifican.
+  const { rol_id } = req.body;
   try {
     // DEF-05: solo se pueden asignar los roles del catálogo (1 administrador, 2 editor)
     const rolValido = await pool.query("SELECT id FROM roles WHERE id = $1", [Number(rol_id)]);
@@ -144,8 +145,8 @@ router.put("/:id", soloAdministrador, async (req, res) => {
       return res.status(400).json({ error: "Datos inválidos", glosa: "El rol indicado no existe." });
     }
     const result = await pool.query(
-      "UPDATE empresa_usuarios SET empresa_id=$1, usuario_id=$2, rol_id=$3 WHERE id=$4 RETURNING *",
-      [empresa_id, usuario_id, rol_id, req.params.id]
+      "UPDATE empresa_usuarios SET rol_id=$1 WHERE id=$2 AND empresa_id=$3 RETURNING *",
+      [rol_id, req.params.id, req.usuario.empresaId]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });
@@ -173,8 +174,8 @@ router.put("/:id", soloAdministrador, async (req, res) => {
 router.delete("/:id", soloAdministrador, async (req, res) => {
   try {
     const result = await pool.query(
-      "DELETE FROM empresa_usuarios WHERE id=$1 RETURNING *",
-      [req.params.id]
+      "DELETE FROM empresa_usuarios WHERE id=$1 AND empresa_id=$2 RETURNING *",
+      [req.params.id, req.usuario.empresaId]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });

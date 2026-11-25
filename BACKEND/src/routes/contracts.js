@@ -11,6 +11,16 @@ const router = express.Router();
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
+// DEF-06: condición que asegura que el contrato pertenece a la empresa de la sesión
+// (los contratos se relacionan con la empresa a través de su cliente).
+const CONTRATO_DE_MI_EMPRESA =
+  "EXISTS (SELECT 1 FROM clientes cl WHERE cl.id = contratos.cliente_id AND cl.empresa_id = $EMP)";
+
+async function clienteDeMiEmpresa(clienteId, empresaId) {
+  const r = await pool.query("SELECT 1 FROM clientes WHERE id = $1 AND empresa_id = $2", [Number(clienteId), empresaId]);
+  return r.rows.length > 0;
+}
+
 // Crear contrato con archivo PDF (guardado en DB como bytea)
 router.post("/", soloAdministrador, upload.single("file"), async (req, res) => {
   const {
@@ -21,6 +31,10 @@ router.post("/", soloAdministrador, upload.single("file"), async (req, res) => {
     fecha_fin,
   } = req.body;
   try {
+    // DEF-06 / RB-3: el cliente del contrato debe ser de la empresa de la sesión
+    if (!(await clienteDeMiEmpresa(cliente_id, req.usuario.empresaId))) {
+      return res.status(404).json({ error: "No encontrado", glosa: "El cliente no existe en su empresa." });
+    }
     const clientIdNum = Number(cliente_id);
     const contractInsert = await pool.query(
       "INSERT INTO contratos (cliente_id, titulo, descripcion, fecha_inicio, fecha_fin) VALUES ($1, $2, $3, $4, $5) RETURNING *",
@@ -236,8 +250,9 @@ router.get("/dashboard", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT id, cliente_id, titulo, descripcion, fecha_inicio, fecha_fin, created_at FROM contratos WHERE id=$1",
-      [req.params.id]
+      `SELECT id, cliente_id, titulo, descripcion, fecha_inicio, fecha_fin, created_at FROM contratos
+        WHERE id=$1 AND ${CONTRATO_DE_MI_EMPRESA.replace("$EMP", "$2")}`,
+      [req.params.id, req.usuario.empresaId]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ error: "No encontrado" });
@@ -283,6 +298,9 @@ router.put("/:id", soloAdministrador, upload.single("file"), async (req, res) =>
     const values = [];
     let paramIndex = 1;
 
+    if (cliente_id !== undefined && !(await clienteDeMiEmpresa(cliente_id, empresaId))) {
+      return res.status(404).json({ error: "No encontrado", glosa: "El cliente no existe en su empresa." });
+    }
     if (cliente_id !== undefined) {
       updates.push(`cliente_id = $${paramIndex}`);
       values.push(Number(cliente_id));
@@ -366,8 +384,11 @@ router.put("/:id", soloAdministrador, upload.single("file"), async (req, res) =>
 router.get("/:id/file", async (req, res) => {
   try {
     const doc = await pool.query(
-      "SELECT document FROM documentos_contrato WHERE contract_id=$1 ORDER BY id DESC LIMIT 1",
-      [req.params.id]
+      `SELECT d.document FROM documentos_contrato d
+         JOIN contratos ON contratos.id = d.contract_id
+        WHERE d.contract_id=$1 AND ${CONTRATO_DE_MI_EMPRESA.replace("$EMP", "$2")}
+        ORDER BY d.id DESC LIMIT 1`,
+      [req.params.id, req.usuario.empresaId]
     );
     if (doc.rows.length === 0)
       return res.status(404).json({ error: "Documento no encontrado" });
@@ -387,6 +408,13 @@ router.get("/:id/file", async (req, res) => {
 // Eliminar contrato y su archivo
 router.delete("/:id", soloAdministrador, async (req, res) => {
   try {
+    // DEF-06: primero se confirma que el contrato es de la empresa de la sesión
+    const propio = await pool.query(
+      `SELECT id FROM contratos WHERE id=$1 AND ${CONTRATO_DE_MI_EMPRESA.replace("$EMP", "$2")}`,
+      [req.params.id, req.usuario.empresaId]
+    );
+    if (propio.rows.length === 0)
+      return res.status(404).json({ error: "No encontrado" });
     await pool.query("DELETE FROM documentos_contrato WHERE contract_id=$1", [
       req.params.id,
     ]);
@@ -394,8 +422,6 @@ router.delete("/:id", soloAdministrador, async (req, res) => {
       "DELETE FROM contratos WHERE id=$1 RETURNING *",
       [req.params.id]
     );
-    if (result.rows.length === 0)
-      return res.status(404).json({ error: "No encontrado" });
 
     const authUser = req.usuario;
     await pool.query(
