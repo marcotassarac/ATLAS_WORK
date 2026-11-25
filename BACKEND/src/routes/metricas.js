@@ -18,7 +18,7 @@ function calcularDiasEntreFechas(fecha1, fecha2) {
 }
 
 // Endpoint de métricas
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const authUser = req.usuario;
 
@@ -147,11 +147,7 @@ router.get("/", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al obtener métricas",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 

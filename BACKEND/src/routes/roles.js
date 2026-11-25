@@ -3,27 +3,27 @@
 // renombrar o eliminar roles (POST/PUT/DELETE /roles sin autenticación ni rol).
 const express = require("express");
 const { pool } = require("../db");
+const { validarId } = require("../errores");
 
 const router = express.Router();
+router.param("id", validarId); // DEF-10: id numérico o 400
 
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const result = await pool.query("SELECT id, nombre FROM roles ORDER BY id");
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error al listar roles", glosa: err.message || err.toString() });
+    next(err);
   }
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", async (req, res, next) => {
   try {
     const result = await pool.query("SELECT id, nombre FROM roles WHERE id=$1", [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: "No encontrado" });
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error al obtener rol", glosa: err.message || err.toString() });
+    next(err);
   }
 });
 

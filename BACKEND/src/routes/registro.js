@@ -10,7 +10,7 @@ const router = express.Router();
 
 const prefijar = (p, e) => Object.fromEntries(Object.entries(e).map(([k, v]) => [p + k, v]));
 
-router.post("/", async (req, res) => {
+router.post("/", async (req, res, next) => {
   if (!req.body || !req.body.usuario || !req.body.empresa) {
     return res.status(400).json({ error: "Datos inválidos", glosa: "Debe enviar los datos del usuario y de la empresa." });
   }
@@ -53,13 +53,7 @@ router.post("/", async (req, res) => {
       empresa: empresaResult.rows[0],
     });
   } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .json({
-        error: "Error al registrar la empresa",
-        glosa: err.message || err.toString(),
-      });
+    next(err);
   }
 });
 

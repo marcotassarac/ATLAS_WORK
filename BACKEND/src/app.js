@@ -17,6 +17,7 @@ const metricasRoutes = require("./routes/metricas");
 const registroRoutes = require("./routes/registro");
 const { autenticar } = require("./middleware/autenticacion");
 const { limiteRegistro } = require("./middleware/limites");
+const { manejadorErrores, rutaNoEncontrada } = require("./errores");
 
 const app = express();
 
@@ -48,6 +49,10 @@ app.use("/empresas", empresasRoutes);
 app.use("/roles", rolesRoutes);
 app.use("/empresa-usuarios", empresaUsuariosRoutes);
 app.use("/metricas", metricasRoutes);
+
+// DEF-10: rutas inexistentes y errores no controlados responden sin detalles internos
+app.use(rutaNoEncontrada);
+app.use(manejadorErrores);
 
 // DEF-04: se elimina /files/contracts, que servía la carpeta de documentos sin
 // autenticación. Los documentos se entregan por /contratos/:id/file.

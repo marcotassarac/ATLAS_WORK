@@ -1,10 +1,12 @@
 const express = require("express");
 const { pool } = require("../db");
+const { validarId } = require("../errores");
 const { validarCliente, validarContrato, validarEmpresa, validarUsuarioNuevo, Validador, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
 const { erroresPolitica, mensajePolitica, hashear } = require("../seguridad/contrasenas");
 
 const router = express.Router();
+router.param("id", validarId); // DEF-10: id numérico o 400
 
 // DEF-06: se elimina POST /usuarios, que creaba cuentas sin empresa. Los usuarios
 // se crean dentro de la empresa con POST /empresa-usuarios.
@@ -13,7 +15,7 @@ const router = express.Router();
 const EN_MI_EMPRESA = "EXISTS (SELECT 1 FROM empresa_usuarios eu WHERE eu.usuario_id = usuarios.id AND eu.empresa_id = $EMP)";
 
 // Listar usuarios filtrados por empresa del token
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const authUser = req.usuario;
 
@@ -29,16 +31,12 @@ router.get("/", async (req, res) => {
 
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al listar usuarios",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Obtener usuario por id
-router.get("/:id", async (req, res) => {
+router.get("/:id", async (req, res, next) => {
   try {
     const result = await pool.query(
       `SELECT id, nombre_usuario, correo, created_at FROM usuarios WHERE id = $1 AND ${EN_MI_EMPRESA.replace("$EMP", "$2")}`,
@@ -48,16 +46,12 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ error: "No encontrado" });
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al obtener usuario",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Actualizar usuario
-router.put("/:id", soloAdministrador, async (req, res) => {
+router.put("/:id", soloAdministrador, async (req, res, next) => {
   const { nombre_usuario, contrasena_hash, correo } = req.body;
   // DEF-09: si se envían, el nombre de usuario y el correo deben tener formato válido
   const v = new Validador(req.body);
@@ -88,16 +82,12 @@ router.put("/:id", soloAdministrador, async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al actualizar usuario",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Eliminar usuario
-router.delete("/:id", soloAdministrador, async (req, res) => {
+router.delete("/:id", soloAdministrador, async (req, res, next) => {
   try {
     const result = await pool.query(
       `DELETE FROM usuarios WHERE id=$1 AND ${EN_MI_EMPRESA.replace("$EMP", "$2")} RETURNING id`,
@@ -117,11 +107,7 @@ router.delete("/:id", soloAdministrador, async (req, res) => {
 
     res.json({ deleted: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al eliminar usuario",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 

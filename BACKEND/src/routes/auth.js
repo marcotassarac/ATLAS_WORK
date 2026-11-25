@@ -12,7 +12,7 @@ const { JWT_SECRET } = require("../config");
 
 
 // Inicio de sesión. DEF-03: la contraseña se compara contra su hash bcrypt.
-router.post("/login", limiteLoginPorIp, limiteLoginPorUsuario, async (req, res) => {
+router.post("/login", limiteLoginPorIp, limiteLoginPorUsuario, async (req, res, next) => {
   const { nombre_usuario, password } = req.body;
   try {
     const result = await pool.query(
@@ -63,16 +63,13 @@ router.post("/login", limiteLoginPorIp, limiteLoginPorUsuario, async (req, res) 
 
     res.json({ token });
   } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ error: "Error en login", glosa: err.message || err.toString() });
+    next(err);
   }
 });
 
 // Cierre de sesión (RF-1.2). DEF-07: antes no existía; el token seguía sirviendo
 // hasta su vencimiento aunque el usuario cerrara sesión.
-router.post("/logout", autenticar, async (req, res) => {
+router.post("/logout", autenticar, async (req, res, next) => {
   try {
     const { jti, exp, usuarioId, nombreUsuario } = req.usuario;
     await pool.query(
@@ -87,8 +84,7 @@ router.post("/logout", autenticar, async (req, res) => {
     ]);
     res.status(204).end();
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error al cerrar sesión" });
+    next(err);
   }
 });
 

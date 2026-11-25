@@ -3,10 +3,12 @@ const fs = require("fs");
 const express = require("express");
 const multer = require("multer");
 const { pool } = require("../db");
+const { validarId } = require("../errores");
 const { validarCliente, validarContrato, validarEmpresa, validarUsuarioNuevo, Validador, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
 
 const router = express.Router();
+router.param("id", validarId); // DEF-10: id numérico o 400
 
 
 const storage = multer.memoryStorage();
@@ -23,7 +25,7 @@ async function clienteDeMiEmpresa(clienteId, empresaId) {
 }
 
 // Crear contrato con archivo PDF (guardado en DB como bytea)
-router.post("/", soloAdministrador, upload.single("file"), async (req, res) => {
+router.post("/", soloAdministrador, upload.single("file"), async (req, res, next) => {
   // DEF-09: validación de cliente, título, descripción y fechas
   const { datos, errores } = validarContrato(req.body);
   if (hayErrores(errores)) return responderErrores(res, errores);
@@ -58,16 +60,12 @@ router.post("/", soloAdministrador, upload.single("file"), async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al crear contrato",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Listar contratos
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const authUser = req.usuario;
     const empresaId = authUser.empresaId;
@@ -90,16 +88,12 @@ router.get("/", async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al listar contratos",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Servicio 1: Contratos por estado (por_vencer y vencido)
-router.get("/estados", async (req, res) => {
+router.get("/estados", async (req, res, next) => {
   try {
     const authUser = req.usuario;
 
@@ -148,16 +142,12 @@ router.get("/estados", async (req, res) => {
 
     res.json([...porVencerConEstado, ...vencidosConEstado]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al obtener contratos por estado",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Servicio 2: Dashboard con estadísticas de la empresa
-router.get("/dashboard", async (req, res) => {
+router.get("/dashboard", async (req, res, next) => {
   try {
     const authUser = req.usuario;
 
@@ -236,16 +226,12 @@ router.get("/dashboard", async (req, res) => {
       contratosVencen30Dias: contratos30Dias,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al obtener estadísticas",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Obtener contrato por id
-router.get("/:id", async (req, res) => {
+router.get("/:id", async (req, res, next) => {
   try {
     const result = await pool.query(
       `SELECT id, cliente_id, titulo, descripcion, fecha_inicio, fecha_fin, created_at FROM contratos
@@ -256,16 +242,12 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ error: "No encontrado" });
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al obtener contrato",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Actualizar contrato
-router.put("/:id", soloAdministrador, upload.single("file"), async (req, res) => {
+router.put("/:id", soloAdministrador, upload.single("file"), async (req, res, next) => {
   try {
     const authUser = req.usuario;
 
@@ -372,16 +354,12 @@ router.put("/:id", soloAdministrador, upload.single("file"), async (req, res) =>
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al actualizar contrato",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Descargar/visualizar el último documento asociado al contrato
-router.get("/:id/file", async (req, res) => {
+router.get("/:id/file", async (req, res, next) => {
   try {
     const doc = await pool.query(
       `SELECT d.document FROM documentos_contrato d
@@ -397,16 +375,12 @@ router.get("/:id/file", async (req, res) => {
     res.setHeader("Content-Disposition", 'inline; filename="contrato.pdf"');
     res.send(buffer);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al obtener archivo",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Eliminar contrato y su archivo
-router.delete("/:id", soloAdministrador, async (req, res) => {
+router.delete("/:id", soloAdministrador, async (req, res, next) => {
   try {
     // DEF-06: primero se confirma que el contrato es de la empresa de la sesión
     const propio = await pool.query(
@@ -434,11 +408,7 @@ router.delete("/:id", soloAdministrador, async (req, res) => {
 
     res.json({ deleted: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al eliminar contrato",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 

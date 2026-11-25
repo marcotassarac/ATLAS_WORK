@@ -1,13 +1,15 @@
 const express = require("express");
 const { pool } = require("../db");
+const { validarId } = require("../errores");
 const { validarCliente, validarContrato, validarEmpresa, validarUsuarioNuevo, Validador, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
 const { erroresPolitica, mensajePolitica, hashear } = require("../seguridad/contrasenas");
 
 const router = express.Router();
+router.param("id", validarId); // DEF-10: id numérico o 400
 
 // Crear relación empresa-usuario con rol (crea usuario si no existe)
-router.post("/", soloAdministrador, async (req, res) => {
+router.post("/", soloAdministrador, async (req, res, next) => {
   try {
     const authUser = req.usuario;
 
@@ -75,16 +77,12 @@ router.post("/", soloAdministrador, async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al crear vínculo",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Listar usuarios de la empresa (filtrado por empresa del token)
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const authUser = req.usuario;
 
@@ -111,16 +109,12 @@ router.get("/", async (req, res) => {
 
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al listar usuarios",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Obtener vínculo por id
-router.get("/:id", async (req, res) => {
+router.get("/:id", async (req, res, next) => {
   try {
     const result = await pool.query(
       "SELECT * FROM empresa_usuarios WHERE id=$1 AND empresa_id=$2",
@@ -130,16 +124,12 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ error: "No encontrado" });
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al obtener vínculo",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Actualizar vínculo
-router.put("/:id", soloAdministrador, async (req, res) => {
+router.put("/:id", soloAdministrador, async (req, res, next) => {
   // DEF-06: solo se puede cambiar el rol; la empresa y el usuario del vínculo no se modifican.
   const { rol_id } = req.body;
   try {
@@ -166,16 +156,12 @@ router.put("/:id", soloAdministrador, async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al actualizar vínculo",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Eliminar vínculo
-router.delete("/:id", soloAdministrador, async (req, res) => {
+router.delete("/:id", soloAdministrador, async (req, res, next) => {
   try {
     const result = await pool.query(
       "DELETE FROM empresa_usuarios WHERE id=$1 AND empresa_id=$2 RETURNING *",
@@ -195,11 +181,7 @@ router.delete("/:id", soloAdministrador, async (req, res) => {
 
     res.json({ deleted: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al eliminar vínculo",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 

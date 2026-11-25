@@ -1,13 +1,15 @@
 const express = require("express");
 const { pool } = require("../db");
+const { validarId } = require("../errores");
 const { validarCliente, validarContrato, validarEmpresa, validarUsuarioNuevo, Validador, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
 
 const router = express.Router();
+router.param("id", validarId); // DEF-10: id numérico o 400
 
 
 // Crear cliente (empresa)
-router.post("/", soloAdministrador, async (req, res) => {
+router.post("/", soloAdministrador, async (req, res, next) => {
   // DEF-09: validación y normalización de todos los campos (RF-4.3)
   const { datos, errores } = validarCliente(req.body);
   if (hayErrores(errores)) return responderErrores(res, errores);
@@ -98,20 +100,14 @@ router.post("/", soloAdministrador, async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al crear cliente",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Listar clientes filtrados por empresa del token
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
     const authUser = req.usuario;
-
-    console.log("authUser", authUser.empresaId);
 
     // Filtrar clientes por empresa_id del token
     const result = await pool.query(
@@ -121,16 +117,12 @@ router.get("/", async (req, res) => {
 
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al listar clientes",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Buscar cliente por nombre (contiene) filtrado por empresa del token
-router.get("/search", async (req, res) => {
+router.get("/search", async (req, res, next) => {
   const { name } = req.query;
   try {
     const authUser = req.usuario;
@@ -141,16 +133,12 @@ router.get("/search", async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error en búsqueda",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Obtener cliente por id (validando que pertenezca a la empresa del token)
-router.get("/:id", async (req, res) => {
+router.get("/:id", async (req, res, next) => {
   try {
     const authUser = req.usuario;
 
@@ -164,16 +152,12 @@ router.get("/:id", async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al obtener cliente",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Editar cliente (validando que pertenezca a la empresa del token)
-router.put("/:id", soloAdministrador, async (req, res) => {
+router.put("/:id", soloAdministrador, async (req, res, next) => {
   // DEF-09: validación y normalización de todos los campos (RF-4.3)
   const { datos, errores } = validarCliente(req.body);
   if (hayErrores(errores)) return responderErrores(res, errores);
@@ -266,16 +250,12 @@ router.put("/:id", soloAdministrador, async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al actualizar cliente",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
 // Eliminar cliente (validando que pertenezca a la empresa del token)
-router.delete("/:id", soloAdministrador, async (req, res) => {
+router.delete("/:id", soloAdministrador, async (req, res, next) => {
   try {
     const authUser = req.usuario;
 
@@ -298,11 +278,7 @@ router.delete("/:id", soloAdministrador, async (req, res) => {
 
     res.json({ deleted: true });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Error al eliminar cliente",
-      glosa: err.message || err.toString(),
-    });
+    next(err);
   }
 });
 
