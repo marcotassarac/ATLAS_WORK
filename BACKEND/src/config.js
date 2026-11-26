@@ -23,7 +23,11 @@ const CORS_ORIGINS = (process.env.CORS_ORIGINS || "")
   .map((o) => o.trim())
   .filter(Boolean);
 
+// DEF-18: clave de 32 bytes (base64) para cifrar datos bancarios en reposo
+const DATA_ENCRYPTION_KEY = requerida("DATA_ENCRYPTION_KEY");
+
 module.exports = {
+  DATA_ENCRYPTION_KEY,
   NODE_ENV: process.env.NODE_ENV || "development",
   CORS_ORIGINS,
   PORT: Number(process.env.PORT) || 3000,

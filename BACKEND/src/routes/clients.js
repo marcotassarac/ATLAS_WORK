@@ -5,6 +5,7 @@ const { validarId } = require("../errores");
 const { validarCliente, hayErrores, responderErrores } = require("../validacion");
 const { soloAdministrador } = require("../middleware/autorizacion");
 const { registrarAuditoria } = require("../auditoria");
+const { cifrar, descifrar, enmascarar } = require("../seguridad/cifrado");
 
 const router = express.Router();
 router.param("id", validarId); // DEF-10: id numérico o 400
@@ -18,7 +19,21 @@ const CAMPOS = [
   "direccion_calle", "direccion_numero", "direccion_ciudad", "direccion_region", "sitio_web", "telefono_corporativo",
   "metodo_pago", "dia_pago", "moneda",
 ];
-const valores = (datos) => CAMPOS.map((c) => datos[c]);
+// DEF-18 (NFR-SEG-3): datos bancarios cifrados en reposo con AES-256-GCM
+const CIFRADOS = ["numero_cuenta", "titular_cuenta"];
+const valores = (datos) => CAMPOS.map((c) => (CIFRADOS.includes(c) ? cifrar(datos[c]) : datos[c]));
+
+// Se descifran solo para la respuesta. El administrador ve el valor completo; el editor,
+// de solo lectura, ve el número de cuenta enmascarado (••••1234).
+function presentar(fila, rol) {
+  if (!fila) return fila;
+  const r = { ...fila };
+  for (const c of CIFRADOS) r[c] = descifrar(r[c]);
+  if (rol !== "administrador") r.numero_cuenta = enmascarar(r.numero_cuenta);
+  delete r.eliminado_en;
+  return r;
+}
+const presentarTodos = (filas, rol) => filas.map((f) => presentar(f, rol));
 
 // Crear cliente
 router.post("/", soloAdministrador, async (req, res, next) => {
@@ -36,7 +51,7 @@ router.post("/", soloAdministrador, async (req, res, next) => {
       await registrarAuditoria(db, req.usuario, `CLIENTES_CREAR: creó cliente ID ${r.rows[0].id}`);
       return r.rows[0];
     });
-    res.status(201).json(cliente);
+    res.status(201).json(presentar(cliente, req.usuario.rol));
   } catch (err) {
     next(err);
   }
@@ -55,7 +70,7 @@ router.get("/", async (req, res, next) => {
     res.set("X-Total-Count", String(total.rows[0].n));
     if (pagina === undefined && limite === undefined) {
       const result = await pool.query(`SELECT * FROM clientes WHERE empresa_id = $1 AND ${VIGENTE} ORDER BY id DESC`, [empresaId]);
-      return res.json(result.rows);
+      return res.json(presentarTodos(result.rows, req.usuario.rol));
     }
     const p = Number(pagina || 1);
     const l = Number(limite || 20);
@@ -66,7 +81,7 @@ router.get("/", async (req, res, next) => {
       `SELECT * FROM clientes WHERE empresa_id = $1 AND ${VIGENTE} ORDER BY id DESC LIMIT $2 OFFSET $3`,
       [empresaId, l, (p - 1) * l]
     );
-    res.json(result.rows);
+    res.json(presentarTodos(result.rows, req.usuario.rol));
   } catch (err) {
     next(err);
   }
@@ -80,7 +95,7 @@ router.get("/search", async (req, res, next) => {
       `SELECT * FROM clientes WHERE nombre ILIKE $1 AND empresa_id = $2 AND ${VIGENTE} ORDER BY nombre ASC`,
       [`%${nombre}%`, req.usuario.empresaId]
     );
-    res.json(result.rows);
+    res.json(presentarTodos(result.rows, req.usuario.rol));
   } catch (err) {
     next(err);
   }
@@ -94,7 +109,7 @@ router.get("/:id", async (req, res, next) => {
       req.usuario.empresaId,
     ]);
     if (result.rows.length === 0) return res.status(404).json({ error: "No encontrado" });
-    res.json(result.rows[0]);
+    res.json(presentar(result.rows[0], req.usuario.rol));
   } catch (err) {
     next(err);
   }
@@ -117,7 +132,7 @@ router.put("/:id", soloAdministrador, async (req, res, next) => {
       return r.rows[0];
     });
     if (!cliente) return res.status(404).json({ error: "No encontrado" });
-    res.json(cliente);
+    res.json(presentar(cliente, req.usuario.rol));
   } catch (err) {
     next(err);
   }
