@@ -35,7 +35,9 @@ router.get("/:token", async (req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("Referrer-Policy", "no-referrer");
-    res.send(buffer);
+    // Excepción revisada (Semgrep direct-response-write): se envía un archivo binario con su tipo de la
+    // lista blanca del servidor, X-Content-Type-Options: nosniff y CSP default-src 'none' (helmet).
+    res.send(buffer); // nosemgrep
   } catch (err) {
     next(err);
   }

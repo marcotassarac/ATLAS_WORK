@@ -371,7 +371,9 @@ router.get("/:id/file", async (req, res, next) => {
     res.setHeader("Cache-Control", "private, no-store");
     // DEF-12: RF-6.1 exige registrar también las descargas de documentos
     await registrarAuditoria(pool, req.usuario, `DOCUMENTOS_DESCARGAR: descargó documento del contrato ID ${req.params.id}`);
-    res.send(buffer);
+    // Excepción revisada (Semgrep direct-response-write): se envía un archivo binario con su tipo de la
+    // lista blanca del servidor, X-Content-Type-Options: nosniff y CSP default-src 'none' (helmet).
+    res.send(buffer); // nosemgrep
   } catch (err) {
     next(err);
   }

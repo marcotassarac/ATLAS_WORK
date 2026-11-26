@@ -92,6 +92,7 @@ services:
       - "${PORT_FRONTEND_TLS:-3443}:8443"
     environment:
       - NGINX_PUERTO_HTTPS=${PORT_FRONTEND_TLS:-3443}
+      - NGINX_DOMINIO=${DOMINIO:-localhost}
     volumes:
       - ./certs:/etc/nginx/certs:ro
     cap_drop:
