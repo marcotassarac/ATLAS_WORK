@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 const morgan = require("morgan");
 const swaggerUi = require("swagger-ui-express");
 
@@ -20,11 +21,29 @@ const { autenticar } = require("./middleware/autenticacion");
 const { limiteRegistro } = require("./middleware/limites");
 const { manejadorErrores, rutaNoEncontrada } = require("./errores");
 
+const { NODE_ENV, CORS_ORIGINS } = require("./config");
+
 const app = express();
 
-app.use(cors());
-app.use(express.json());
-app.use(morgan("dev"));
+// DEF-16: cabeceras de seguridad (CSP, HSTS, nosniff, frame-ancestors, etc.) y sin X-Powered-By
+app.use(
+  helmet({
+    contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"], baseUri: ["'none'"] } },
+    strictTransportSecurity: { maxAge: 31536000, includeSubDomains: true },
+    referrerPolicy: { policy: "no-referrer" },
+    crossOriginResourcePolicy: { policy: "same-site" },
+  })
+);
+// DEF-16: CORS solo para los orígenes configurados (antes "*": cualquier sitio)
+app.use(
+  cors({
+    origin: (origen, cb) => cb(null, !origen || CORS_ORIGINS.includes(origen)),
+    exposedHeaders: ["X-Total-Count", "RateLimit", "RateLimit-Policy", "Retry-After"],
+    maxAge: 600,
+  })
+);
+app.use(express.json({ limit: "100kb" }));
+app.use(morgan(NODE_ENV === "production" ? "combined" : "dev"));
 
 // Rutas públicas: inicio de sesión, registro y estado del servicio.
 app.use("/autenticacion", authRoutes);
@@ -35,11 +54,18 @@ app.get("/", (req, res) => {
   res.json({ name: "Atlas", status: "ok" });
 });
 
-const openapi = require("./openapi.json");
-app.use("/docs", swaggerUi.serve, swaggerUi.setup(openapi));
-app.get("/openapi.json", (req, res) => {
-  res.json(openapi);
-});
+// DEF-16: la documentación interactiva solo se publica fuera de producción
+if (NODE_ENV !== "production") {
+  const openapi = require("./openapi.json");
+  const cspDocs = (req, res, next) => {
+    res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:");
+    next();
+  };
+  app.use("/docs", cspDocs, swaggerUi.serve, swaggerUi.setup(openapi));
+  app.get("/openapi.json", (req, res) => {
+    res.json(openapi);
+  });
+}
 
 // DEF-04: desde aquí, toda ruta exige un token válido.
 app.use(autenticar);

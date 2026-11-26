@@ -38,6 +38,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copiar configuración de nginx personalizada
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY cabeceras_seguridad.conf /etc/nginx/snippets/cabeceras_seguridad.conf
 
 # Exponer puerto 80
 EXPOSE 80

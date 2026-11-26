@@ -16,8 +16,16 @@ if (JWT_SECRET.length < 32) {
   throw new Error("JWT_SECRET debe tener al menos 32 caracteres");
 }
 
+// DEF-16: orígenes autorizados para CORS (lista separada por comas). Sin valor, la API
+// no habilita CORS para ningún origen externo.
+const CORS_ORIGINS = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 module.exports = {
   NODE_ENV: process.env.NODE_ENV || "development",
+  CORS_ORIGINS,
   PORT: Number(process.env.PORT) || 3000,
   DATABASE_URL: requerida("DATABASE_URL"),
   JWT_SECRET,
