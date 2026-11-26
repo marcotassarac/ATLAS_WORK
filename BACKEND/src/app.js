@@ -47,7 +47,16 @@ app.use(
   })
 );
 app.use(express.json({ limit: "100kb" }));
-app.use(morgan(NODE_ENV === "production" ? "combined" : "dev"));
+// DEF-23: el token de los enlaces compartidos no se escribe en el log de acceso
+// (quien leyera el log podría descargar el documento mientras el enlace esté vigente).
+morgan.token("url-segura", (req) => req.originalUrl.replace(/\/compartido\/[^/?]+/, "/compartido/[oculto]"));
+app.use(
+  morgan(
+    NODE_ENV === "production"
+      ? ':remote-addr - :remote-user [:date[clf]] ":method :url-segura HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent"'
+      : ":method :url-segura :status :response-time ms"
+  )
+);
 
 // Rutas públicas: inicio de sesión, registro y estado del servicio.
 app.use("/autenticacion", authRoutes);
