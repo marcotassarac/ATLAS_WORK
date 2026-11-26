@@ -9,6 +9,7 @@ RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"
 export MSYS_NO_PATHCONV=1
 win() { if command -v cygpath >/dev/null; then cygpath -m "$1"; else echo "$1"; fi; }
+RAIZ="$(win "$RAIZ")"; OUT="$(win "$OUT")"
 SQ=http://localhost:9000
 PASS="${SONAR_ADMIN_PASS:?definir SONAR_ADMIN_PASS}"
 
@@ -29,7 +30,7 @@ curl -s -u "admin:$PASS" -X POST "$SQ/api/projects/create" --data-urlencode "pro
 docker run --rm --add-host=host.docker.internal:host-gateway -v "$(win "$RAIZ"):/usr/src" sonarsource/sonar-scanner-cli:latest \
   -Dsonar.host.url=http://host.docker.internal:9000 -Dsonar.token="$TOKEN" -Dsonar.projectKey="$CLAVE" \
   -Dsonar.projectName="$CLAVE" -Dsonar.sources=BACKEND,FRONTEND \
-  -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/.env,**/sql/dump-atlas.sql" \
+  -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/coverage/**,**/test/**,**/.env,**/sql/dump-atlas.sql" \
   -Dsonar.javascript.lcov.reportPaths=BACKEND/coverage/lcov.info \
   -Dsonar.scm.disabled=true > "$OUT/sonar_scanner.txt" 2>&1
 tail -n 3 "$OUT/sonar_scanner.txt"
@@ -42,7 +43,7 @@ M="ncloc,bugs,vulnerabilities,code_smells,security_hotspots,duplicated_lines_den
 curl -s -u "admin:$PASS" "$SQ/api/measures/component?component=$CLAVE&metricKeys=$M" > "$OUT/sonar_medidas.json"
 curl -s -u "admin:$PASS" "$SQ/api/qualitygates/project_status?projectKey=$CLAVE" > "$OUT/sonar_puerta_calidad.json"
 curl -s -u "admin:$PASS" "$SQ/api/issues/search?componentKeys=$CLAVE&ps=500&resolved=false" > "$OUT/sonar_issues.json"
-curl -s -u "admin:$PASS" "$SQ/api/hotspots/search?projectKey=$CLAVE&ps=500" > "$OUT/sonar_hotspots.json"
+curl -s -u "admin:$PASS" "$SQ/api/hotspots/search?project=$CLAVE&ps=500" > "$OUT/sonar_hotspots.json"
 python -X utf8 - "$OUT" <<'EOF'
 import json, sys, collections, os
 o = sys.argv[1]
