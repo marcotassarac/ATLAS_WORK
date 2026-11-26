@@ -34,11 +34,45 @@ async function migrar(pool) {
   }
 }
 
-module.exports = { migrar };
+// DEF-19: cuenta de la API con privilegios mínimos.
+// - Puede leer y escribir datos de negocio, pero no crear ni modificar tablas.
+// - No puede modificar ni borrar la auditoría (RF-6.1: el registro no se puede
+//   modificar ni borrar desde la aplicación).
+// Se ejecuta en cada despliegue, por lo que también aplica una rotación de contraseña.
+async function asegurarUsuarioAplicacion(pool) {
+  const usuario = process.env.APP_DB_USER || "atlas_app";
+  const clave = process.env.APP_DB_PASSWORD;
+  if (!clave) return;
+  if (!/^[a-z_][a-z0-9_]{2,40}$/.test(usuario)) throw new Error("APP_DB_USER no es un identificador válido");
+  const cliente = await pool.connect();
+  try {
+    await cliente.query("BEGIN");
+    const existe = await cliente.query("SELECT 1 FROM pg_roles WHERE rolname = $1", [usuario]);
+    const accion = existe.rows.length ? "ALTER" : "CREATE";
+    await cliente.query(`${accion} ROLE ${usuario} WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD ${cliente.escapeLiteral(clave)}`);
+    const db = (await cliente.query("SELECT current_database() AS d")).rows[0].d;
+    await cliente.query(`GRANT CONNECT ON DATABASE ${cliente.escapeIdentifier(db)} TO ${usuario}`);
+    await cliente.query(`GRANT USAGE ON SCHEMA public TO ${usuario}`);
+    await cliente.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${usuario}`);
+    await cliente.query(`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${usuario}`);
+    await cliente.query(`REVOKE UPDATE, DELETE, TRUNCATE ON auditoria FROM ${usuario}`);
+    await cliente.query(`REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON schema_migraciones FROM ${usuario}`);
+    await cliente.query("COMMIT");
+    console.log(`Cuenta de la aplicación "${usuario}" actualizada con privilegios mínimos.`);
+  } catch (err) {
+    await cliente.query("ROLLBACK");
+    throw err;
+  } finally {
+    cliente.release();
+  }
+}
+
+module.exports = { migrar, asegurarUsuarioAplicacion };
 
 if (require.main === module) {
   const { pool } = require("./db");
   migrar(pool)
+    .then(() => asegurarUsuarioAplicacion(pool))
     .then(() => { console.log("Migraciones al día."); return pool.end(); })
     .catch((e) => { console.error(e.message); process.exit(1); });
 }

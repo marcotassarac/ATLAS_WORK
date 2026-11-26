@@ -93,7 +93,11 @@ app.use(manejadorErrores);
 const { PORT } = require("./config");
 const { migrar } = require("./migraciones");
 
-migrar(pool)
+// DEF-19: en Docker las migraciones las aplica el servicio atlas-migraciones con la
+// cuenta de administración; la API (cuenta sin DDL) no las ejecuta.
+const aplicarMigraciones = process.env.MIGRAR_AL_INICIAR === "false" ? Promise.resolve() : migrar(pool);
+
+aplicarMigraciones
   .then(() => {
     app.listen(PORT, () => {
       console.log(`Atlas API escuchando en puerto ${PORT}`);
