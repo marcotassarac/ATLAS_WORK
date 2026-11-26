@@ -12,6 +12,8 @@ RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"
 export MSYS_NO_PATHCONV=1
 win() { if command -v cygpath >/dev/null; then cygpath -m "$1"; else echo "$1"; fi; }
+# En Windows (Git Bash) se usan rutas C:/... que entienden bash, Python, Node y Docker
+RAIZ="$(win "$RAIZ")"; OUT="$(win "$OUT")"
 
 API_URL="${API_URL:-http://localhost:4450}"
 FRONT_URL="${FRONT_URL:-http://localhost:3350}"
@@ -109,7 +111,7 @@ fi
 if ! omitido k6; then
   log "Carga · k6 (10 usuarios 1 min + 200 usuarios 5 min)"
   mkdir -p "$OUT/k6"
-  docker run --rm -v "$(win "$RAIZ/pruebas/k6"):/scripts:ro" -v "$(win "$OUT/k6"):/scripts/salida" \
+  docker run --rm -v "$(win "$RAIZ/pruebas/k6"):/scripts:ro" -v "$(win "$OUT/k6"):/salida" \
     -e API_URL="$API_URL_DOCKER" grafana/k6:latest run --quiet /scripts/carga_atlas.js > "$OUT/k6/k6_consola.txt" 2>&1
   tail -n 15 "$OUT/k6/k6_consola.txt"
 fi

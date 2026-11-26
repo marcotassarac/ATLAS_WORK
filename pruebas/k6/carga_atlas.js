@@ -81,7 +81,7 @@ export function handleSummary(data) {
   ];
   return {
     stdout: lineas.join("\n"),
-    "/scripts/salida/k6_resumen.txt": lineas.join("\n"),
-    "/scripts/salida/k6_resumen.json": JSON.stringify(data, null, 2),
+    "/salida/k6_resumen.txt": lineas.join("\n"),
+    "/salida/k6_resumen.json": JSON.stringify(data, null, 2),
   };
 }
