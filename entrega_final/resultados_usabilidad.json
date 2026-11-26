@@ -1,0 +1,162 @@
+{
+  "evaluador": "Marco Tassara (líder de QA)",
+  "fecha": "26-11-2026, 02:53:53",
+  "version": "v2.1",
+  "completadas": 11,
+  "total": 11,
+  "segundos": 65,
+  "errores": 3,
+  "tareas": [
+    {
+      "id": "U-01",
+      "nombre": "Registrar mi empresa y mi cuenta",
+      "objetivo": "Crear la cuenta del administrador y la empresa aceptando la política de privacidad.",
+      "pasos": 18,
+      "errores": [
+        "Olvidó marcar la casilla de privacidad: la interfaz lo advirtió antes de continuar.",
+        "La contraseña «tassara2026» no cumple la política; el mensaje indicó cada requisito faltante (largo mínimo, mayúscula y símbolo)."
+      ],
+      "completada": true,
+      "mensajes": [
+        "Contraseña insegura La contraseña debe tener al menos 12 caracteres, incluir una letra mayúscula, incluir un símbolo.",
+        "Cuenta creada exitosamente, ahora inicia sesión"
+      ],
+      "captura": "capturas/U-01.png",
+      "segundos": 11
+    },
+    {
+      "id": "U-02",
+      "nombre": "Iniciar sesión",
+      "objetivo": "Ingresar con el usuario y la contraseña recién creados.",
+      "pasos": 3,
+      "errores": [],
+      "completada": true,
+      "mensajes": [
+        "Sesión iniciada",
+        "Cuenta creada exitosamente, ahora inicia sesión"
+      ],
+      "captura": "capturas/U-02.png",
+      "segundos": 2.8
+    },
+    {
+      "id": "U-03",
+      "nombre": "Registrar un cliente",
+      "objetivo": "Crear el cliente «Ferretería San Pablo» con sus datos de contacto y bancarios.",
+      "pasos": 10,
+      "errores": [
+        "Escribió el correo sin dominio (.cl); el sistema indicó el campo exacto a corregir."
+      ],
+      "completada": true,
+      "mensajes": [
+        "Datos inválidos Revise los campos: correo no tiene un formato de correo válido.",
+        "Cliente creado"
+      ],
+      "captura": "capturas/U-03.png",
+      "segundos": 7.1
+    },
+    {
+      "id": "U-04",
+      "nombre": "Encontrar el cliente en el listado",
+      "objetivo": "Ubicar el cliente creado en la lista de clientes.",
+      "pasos": 1,
+      "errores": [],
+      "completada": true,
+      "mensajes": [
+        "Cliente creado"
+      ],
+      "captura": "capturas/U-04.png",
+      "segundos": 1.8
+    },
+    {
+      "id": "U-05",
+      "nombre": "Crear un contrato con su documento",
+      "objetivo": "Crear un contrato para el cliente y adjuntar el PDF firmado.",
+      "pasos": 9,
+      "errores": [],
+      "completada": true,
+      "mensajes": [
+        "Contrato creado"
+      ],
+      "captura": "capturas/U-05.png",
+      "segundos": 5.2
+    },
+    {
+      "id": "U-06",
+      "nombre": "Compartir el documento del contrato",
+      "objetivo": "Abrir el contrato y generar un enlace temporal para enviarlo al cliente.",
+      "pasos": 3,
+      "errores": [],
+      "completada": true,
+      "mensajes": [
+        "Enlace generado (válido por 60 minutos) https://127.0.0.1:3443/api/contratos/compartido/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aXBvIjoiZW5sYWNlX2RvY3VtZW50byIsImNvbnRyYXRvSWQiOjMsImVtcHJlc2FJZCI6MiwiaWF0IjoxNzk1NjcyMzk3LCJleHAiOjE3OTU2NzU5OTcsImp0aSI6ImM5MWMxNTczLTljYTYtNDM2ZS1iNjY5LTZlMTE4ZWUyNDQwNCJ9.I6kgFmgDJYOQ4xL8r_lOJbZy7COsmGbiw0RPsiPktfQ"
+      ],
+      "captura": "capturas/U-06.png",
+      "segundos": 4.3
+    },
+    {
+      "id": "U-07",
+      "nombre": "Dar acceso de solo lectura a un colaborador",
+      "objetivo": "Crear el usuario de un colaborador con el rol editor.",
+      "pasos": 6,
+      "errores": [],
+      "completada": true,
+      "mensajes": [
+        "Usuario creado"
+      ],
+      "captura": "capturas/U-07.png",
+      "segundos": 21.8
+    },
+    {
+      "id": "U-08",
+      "nombre": "Revisar quién hizo cada acción",
+      "objetivo": "Consultar la auditoría y encontrar la creación del cliente.",
+      "pasos": 1,
+      "errores": [],
+      "completada": true,
+      "mensajes": [
+        "Usuario creado"
+      ],
+      "captura": "capturas/U-08.png",
+      "segundos": 2.1
+    },
+    {
+      "id": "U-09",
+      "nombre": "Actualizar mi correo",
+      "objetivo": "Cambiar el correo de la propia cuenta desde «Editar cuenta».",
+      "pasos": 3,
+      "errores": [],
+      "completada": true,
+      "mensajes": [
+        "Información del usuario actualizada"
+      ],
+      "captura": "capturas/U-09.png",
+      "segundos": 3
+    },
+    {
+      "id": "U-10",
+      "nombre": "Cerrar sesión",
+      "objetivo": "Salir del sistema de forma segura.",
+      "pasos": 1,
+      "errores": [],
+      "completada": true,
+      "mensajes": [
+        "Información del usuario actualizada"
+      ],
+      "captura": "capturas/U-10.png",
+      "segundos": 1.6
+    },
+    {
+      "id": "U-11",
+      "nombre": "Ingresar desde el teléfono",
+      "objetivo": "Iniciar sesión en una pantalla de 360 px de ancho.",
+      "pasos": 3,
+      "errores": [],
+      "completada": true,
+      "mensajes": [
+        "Sesión iniciada"
+      ],
+      "captura": "capturas/U-11.png",
+      "segundos": 3.9
+    }
+  ]
+}

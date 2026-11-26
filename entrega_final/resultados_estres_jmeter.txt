@@ -1,0 +1,8 @@
+Usuarios Solicitudes   req/s  Media ms  p95 ms  Máx ms  Error %
+      25        2699    45.4       8.0      13     120      0.0
+      50        5411    90.9       6.8      10      39      0.0
+     100       10803   181.5       6.9      12      60      0.0
+     200       21369   358.9      12.7      34     111      0.0
+     400       27647   462.2     293.8     431     521     0.36
+     800       28869   475.2    1029.8    2054    6284     6.22
+Capacidad sostenida (error < 1 % y p95 < 1 s): 400 usuarios · punto de quiebre: 800
