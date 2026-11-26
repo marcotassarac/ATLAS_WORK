@@ -25,6 +25,10 @@ const { NODE_ENV, CORS_ORIGINS } = require("./config");
 
 const app = express();
 
+// DEF-17: la API está detrás de nginx (un salto). Se confía solo en ese proxy para
+// conocer la IP real del cliente (la usan los límites de intentos de DEF-08).
+app.set("trust proxy", 1);
+
 // DEF-16: cabeceras de seguridad (CSP, HSTS, nosniff, frame-ancestors, etc.) y sin X-Powered-By
 app.use(
   helmet({

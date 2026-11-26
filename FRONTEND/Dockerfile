@@ -4,7 +4,7 @@ FROM node:20 AS builder
 WORKDIR /app
 
 # Argumento para la URL de la API
-ARG VITE_API_URL=http://localhost:4000
+ARG VITE_API_URL=/api
 
 # Copiar archivos de dependencias
 COPY package*.json ./
@@ -37,11 +37,11 @@ FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copiar configuración de nginx personalizada
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# DEF-17: plantilla con TLS; la imagen sustituye ${NGINX_PUERTO_HTTPS} al iniciar
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 COPY cabeceras_seguridad.conf /etc/nginx/snippets/cabeceras_seguridad.conf
 
-# Exponer puerto 80
-EXPOSE 80
+EXPOSE 8080 8443
 
 # Comando para iniciar nginx
 CMD ["nginx", "-g", "daemon off;"]

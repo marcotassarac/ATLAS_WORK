@@ -29,7 +29,8 @@ export default function ContratoDetalle() {
   // DEF-15 (RF-5.5): enlace de vigencia limitada para compartir el documento
   const onCompartir = async () => {
     const { data } = await api.post(`/contratos/${id}/enlace`, { minutos: 60 });
-    const url = data.url.startsWith("http") ? data.url : `${API_URL}${data.url}`;
+    const base = API_URL.startsWith("http") ? API_URL : `${window.location.origin}${API_URL}`;
+    const url = data.url.startsWith("http") ? data.url : `${base}${data.url}`;
     try {
       await navigator.clipboard.writeText(url);
       toast.success("Enlace copiado (válido por 60 minutos)", { description: url });

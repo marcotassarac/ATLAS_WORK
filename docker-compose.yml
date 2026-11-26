@@ -33,10 +33,9 @@ services:
       - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}@atlas-postgres:5432/${POSTGRES_DB:-atlas}
       - NODE_ENV=${NODE_ENV:-production}
       # DEF-16: orígenes autorizados para CORS
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3350}
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://localhost:3443}
       - JWT_SECRET=${JWT_SECRET:?Defina JWT_SECRET en .env (ver .env.example)}
-    ports:
-      - "${PORT_BACKEND:-4450}:4000"
+    # DEF-17: la API no publica su puerto HTTP; se accede solo por HTTPS a través de nginx (/api)
     depends_on:
       atlas-postgres:
         condition: service_healthy
@@ -51,11 +50,17 @@ services:
       context: ./FRONTEND
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: "http://localhost:${PORT_BACKEND:-4450}"
+        VITE_API_URL: "/api"
     container_name: atlas-frontend
     hostname: atlas-web
+    # DEF-17: HTTP (solo redirige) y HTTPS
     ports:
-      - "${PORT_FRONTEND:-3350}:80"
+      - "${PORT_FRONTEND:-3350}:8080"
+      - "${PORT_FRONTEND_TLS:-3443}:8443"
+    environment:
+      - NGINX_PUERTO_HTTPS=${PORT_FRONTEND_TLS:-3443}
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
     depends_on:
       - atlas-backend
     networks:
