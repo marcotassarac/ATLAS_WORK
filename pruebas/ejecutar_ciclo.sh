@@ -133,9 +133,24 @@ if ! omitido zap; then
     -t "$FRONT_URL_DOCKER" -r zap_frontend.html -J zap_frontend.json -I > "$OUT/zap/zap_frontend_consola.txt" 2>&1
   # Si la API no publica /openapi.json (producción), se usa la especificación del repositorio
   OBJETIVO_API="$OPENAPI_URL_DOCKER"
-  if [ -n "${OPENAPI_ARCHIVO:-}" ]; then cp "$OPENAPI_ARCHIVO" "$OUT/zap/openapi.json"; OBJETIVO_API=/zap/wrk/openapi.json; fi
+  OVERRIDE=(-O "$API_URL_DOCKER")
+  if [ -n "${OPENAPI_ARCHIVO:-}" ]; then
+    # Copia de la especificación con la URL real de la API (incluye el prefijo /api)
+    python -X utf8 -c "import json,sys;d=json.load(open(sys.argv[1],encoding='utf-8'));d['servers']=[{'url':sys.argv[2]}];json.dump(d,open(sys.argv[3],'w',encoding='utf-8'))" \
+      "$OPENAPI_ARCHIVO" "$API_URL_DOCKER" "$OUT/zap/openapi.json"
+    OBJETIVO_API=/zap/wrk/openapi.json; OVERRIDE=()
+  fi
   docker run --rm -v "$(win "$OUT/zap"):/zap/wrk:rw" zaproxy/zap-stable:latest zap-api-scan.py \
-    -t "$OBJETIVO_API" -f openapi -O "$API_URL_DOCKER" -r zap_api.html -J zap_api.json -I > "$OUT/zap/zap_api_consola.txt" 2>&1
+    -t "$OBJETIVO_API" -f openapi "${OVERRIDE[@]}" -r zap_api.html -J zap_api.json -I > "$OUT/zap/zap_api_consola.txt" 2>&1
+  # Escaneo autenticado opcional (token de administrador inyectado en cada solicitud)
+  if [ "${ZAP_AUTENTICADO:-0}" = "1" ]; then
+    TOKEN_ZAP=$(curl -sk -X POST "$API_URL/autenticacion/login" -H "Content-Type: application/json" \
+      -d '{"nombre_usuario":"admin","password":"admin"}' | python -c "import json,sys;print(json.load(sys.stdin).get('token',''))")
+    docker run --rm -e ZAP_AUTH_HEADER=Authorization -e ZAP_AUTH_HEADER_VALUE="Bearer $TOKEN_ZAP" \
+      -v "$(win "$OUT/zap"):/zap/wrk:rw" zaproxy/zap-stable:latest zap-api-scan.py \
+      -t "$OBJETIVO_API" -f openapi "${OVERRIDE[@]}" -r zap_api_autenticado.html -J zap_api_autenticado.json -I \
+      > "$OUT/zap/zap_api_autenticado_consola.txt" 2>&1
+  fi
   python -X utf8 "$RAIZ/pruebas/resumir_zap.py" "$OUT/zap" | tee "$OUT/zap/resumen.txt"
 fi
 

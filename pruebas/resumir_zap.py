@@ -3,7 +3,7 @@ import collections, json, os, sys
 
 carpeta = sys.argv[1]
 riesgo = {"3": "Alto", "2": "Medio", "1": "Bajo", "0": "Informativo"}
-for nombre in ("zap_frontend.json", "zap_api.json"):
+for nombre in ("zap_frontend.json", "zap_api.json", "zap_api_autenticado.json"):
     f = os.path.join(carpeta, nombre)
     if not os.path.exists(f):
         print(f"{nombre}: no generado")
