@@ -1,11 +1,14 @@
 {
   "name": "atlas",
   "version": "1.0.0",
-  "description": "API Atlas - Express + PostgreSQL (intencionalmente vulnerable)",
+  "description": "API Atlas - Express + PostgreSQL (versión corregida, Ciclo 2 EV3)",
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon"
+    "dev": "nodemon",
+    "migrar": "node src/migraciones.js",
+    "test": "node --test \"test/*.test.js\"",
+    "test:cobertura": "node --test --experimental-test-coverage --test-coverage-include=src/** --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info \"test/*.test.js\""
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -22,5 +25,8 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

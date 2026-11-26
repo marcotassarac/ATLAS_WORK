@@ -55,7 +55,9 @@ router.get("/:id", async (req, res, next) => {
 // solo el correo y la consulta dejaba nombre_usuario en NULL (error 500).
 // El administrador edita a los usuarios de su empresa; cada usuario puede editar su
 // propia cuenta (correo y contraseña), incluido el editor.
-router.put("/:id", async (req, res, next) => {
+// Excepción revisada (regla atlas-escritura-sin-control-de-rol): el control es "administrador o la
+// propia cuenta" y se hace en la primera línea del handler.
+router.put("/:id", async (req, res, next) => { // nosemgrep
   if (!esAdministrador(req) && !esPropio(req)) {
     return res.status(403).json({ error: "Prohibido", glosa: "Solo puede modificar su propia cuenta." });
   }
@@ -100,7 +102,8 @@ router.put("/:id", async (req, res, next) => {
 // borrar la fila. Ahora se elimina el vínculo con la empresa y, si el usuario no
 // pertenece a otra empresa, también su cuenta. Un administrador no puede eliminarse
 // a sí mismo ni dejar a la empresa sin administradores.
-router.delete("/:id", async (req, res, next) => {
+// Excepción revisada: el rol se verifica en la primera línea del handler (403 al editor).
+router.delete("/:id", async (req, res, next) => { // nosemgrep
   if (!esAdministrador(req)) {
     return res.status(403).json({ error: "Prohibido", glosa: "Su rol no permite realizar esta operación." });
   }

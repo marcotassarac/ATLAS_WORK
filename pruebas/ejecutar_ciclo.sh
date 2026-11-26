@@ -48,7 +48,7 @@ if ! omitido semgrep; then
   mkdir -p "$OUT/sast"
   docker run --rm -v "$(win "$RAIZ"):/src" -w /src semgrep/semgrep:latest semgrep scan \
     --config p/javascript --config p/nodejs --config p/react --config p/secrets --config p/dockerfile \
-    --config p/owasp-top-ten --config p/jwt --metrics off \
+    --config p/owasp-top-ten --config p/jwt --config pruebas/semgrep/reglas_atlas.yml --metrics off \
     --exclude node_modules --exclude pruebas --exclude dist --exclude "*.sql" \
     --json --output /src/.semgrep_salida.json > "$OUT/sast/semgrep_consola.txt" 2>&1
   mv "$RAIZ/.semgrep_salida.json" "$OUT/sast/semgrep.json" 2>/dev/null
@@ -79,6 +79,15 @@ if ! omitido trivy; then
   docker run --rm -v "$(win "$RAIZ"):/src" -v trivy-cache:/root/.cache/ aquasec/trivy:latest \
     config --quiet --format json /src > "$OUT/contenedores/trivy_config.json" 2>/dev/null
   python -X utf8 "$RAIZ/pruebas/resumir_trivy.py" "$OUT/contenedores" | tee "$OUT/contenedores/resumen.txt"
+fi
+
+# ---------------------------------------------------------------- 4b. Pruebas unitarias del backend (node:test)
+if ! omitido unitarias && grep -q '"test:cobertura"' "$RAIZ/BACKEND/package.json"; then
+  log "Pruebas unitarias · node:test con cobertura"
+  mkdir -p "$OUT/unitarias"
+  (cd "$RAIZ/BACKEND" && npm run --silent test:cobertura) > "$OUT/unitarias/unitarias_consola.txt" 2>&1
+  cp "$RAIZ/BACKEND/coverage/lcov.info" "$OUT/unitarias/" 2>/dev/null
+  grep -E "(tests|pass|fail) [0-9]|all files" "$OUT/unitarias/unitarias_consola.txt" | tee "$OUT/unitarias/resumen.txt"
 fi
 
 # ---------------------------------------------------------------- 5. Pruebas de API (funcionales y de seguridad)
@@ -122,8 +131,11 @@ if ! omitido zap; then
   mkdir -p "$OUT/zap"; chmod 777 "$OUT/zap" 2>/dev/null
   docker run --rm -v "$(win "$OUT/zap"):/zap/wrk:rw" zaproxy/zap-stable:latest zap-baseline.py \
     -t "$FRONT_URL_DOCKER" -r zap_frontend.html -J zap_frontend.json -I > "$OUT/zap/zap_frontend_consola.txt" 2>&1
+  # Si la API no publica /openapi.json (producción), se usa la especificación del repositorio
+  OBJETIVO_API="$OPENAPI_URL_DOCKER"
+  if [ -n "${OPENAPI_ARCHIVO:-}" ]; then cp "$OPENAPI_ARCHIVO" "$OUT/zap/openapi.json"; OBJETIVO_API=/zap/wrk/openapi.json; fi
   docker run --rm -v "$(win "$OUT/zap"):/zap/wrk:rw" zaproxy/zap-stable:latest zap-api-scan.py \
-    -t "$OPENAPI_URL_DOCKER" -f openapi -O "$API_URL_DOCKER" -r zap_api.html -J zap_api.json -I > "$OUT/zap/zap_api_consola.txt" 2>&1
+    -t "$OBJETIVO_API" -f openapi -O "$API_URL_DOCKER" -r zap_api.html -J zap_api.json -I > "$OUT/zap/zap_api_consola.txt" 2>&1
   python -X utf8 "$RAIZ/pruebas/resumir_zap.py" "$OUT/zap" | tee "$OUT/zap/resumen.txt"
 fi
 

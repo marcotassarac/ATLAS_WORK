@@ -14,7 +14,9 @@ const VERSION_POLITICA = "1.0-2026-11";
 
 const prefijar = (p, e) => Object.fromEntries(Object.entries(e).map(([k, v]) => [p + k, v]));
 
-router.post("/", async (req, res, next) => {
+// Excepción revisada (regla atlas-escritura-sin-control-de-rol): ruta pública por diseño (RF-2.1),
+// protegida con límite de registros por IP, validación y consentimiento.
+router.post("/", async (req, res, next) => { // nosemgrep
   if (!req.body || !req.body.usuario || !req.body.empresa) {
     return res.status(400).json({ error: "Datos inválidos", glosa: "Debe enviar los datos del usuario y de la empresa." });
   }

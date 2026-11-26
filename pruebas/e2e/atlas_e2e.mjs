@@ -51,6 +51,8 @@ async function loginUI(page, usuario, clave) {
   await page.getByTestId("input-password").fill(clave);
   await page.getByTestId("button-login").click();
   await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 30000 }).catch(() => {});
+  // Desde la v1.22 las pantallas se cargan bajo demanda: se espera a que el menú esté visible
+  await page.getByTestId("button-layout-logout").waitFor({ state: "visible", timeout: 30000 }).catch(() => {});
   await page.waitForLoadState("networkidle").catch(() => {});
 }
 async function apiLogin(usuario, clave) {

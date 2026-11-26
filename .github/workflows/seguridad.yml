@@ -1,0 +1,178 @@
+# Pipeline de controles de seguridad y calidad automatizados - Atlas (ISY1102 EV3)
+#
+# Implementa el diagrama de controles del informe: cada cambio pasa por puertas que
+# bloquean el avance si no se cumple el criterio. El orden va de lo más barato (minutos,
+# sin levantar la aplicación) a lo más costoso (aplicación completa y escaneo dinámico).
+#
+#   1. Secretos (Gitleaks)        -> bloquea si hay secretos en el código o el historial   ERS 2.4 · CWE-798
+#   2. SAST (Semgrep)             -> bloquea hallazgos ERROR (comunidad + reglas propias)  OWASP Top 10
+#   3. SCA (npm audit)            -> bloquea vulnerabilidades altas o críticas            OWASP A06
+#   4. Pruebas unitarias          -> bloquea si falla una prueba; publica la cobertura
+#   5. Calidad (SonarQube)        -> bloquea si la puerta de calidad falla (si hay token)
+#   6. Imágenes (Trivy)           -> bloquea críticas/altas con corrección y Dockerfile con root
+#   7. Integración y seguridad    -> suite de API, interfaz (Playwright + axe) y ZAP baseline
+#   8. Puerta humana (ambiente qa)-> aprobación de QA antes de desplegar (no se certifica con
+#                                    defectos críticos abiertos)
+name: Controles de seguridad y calidad
+
+on:
+  pull_request:
+  push:
+    branches: [main, "ciclo2-*"]
+  schedule:
+    - cron: "0 6 * * 1" # todos los lunes: nuevas vulnerabilidades publicadas en dependencias e imágenes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  secretos:
+    name: 1 · Secretos (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Buscar secretos en el código y el historial
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest git /repo --redact --no-banner \
+            --log-opts="v1.1..HEAD"
+        # Se revisa desde la v1.1: los secretos de la v1.0 están documentados como
+        # comprometidos (DEF-01) y fueron rotados.
+
+  sast:
+    name: 2 · Análisis estático (Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep (OWASP Top 10, Node.js, React, JWT, Dockerfile y reglas propias de Atlas)
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src semgrep/semgrep:latest semgrep scan \
+            --config p/javascript --config p/nodejs --config p/react --config p/secrets \
+            --config p/dockerfile --config p/owasp-top-ten --config p/jwt \
+            --config pruebas/semgrep/reglas_atlas.yml \
+            --exclude node_modules --exclude pruebas --metrics off --error --severity ERROR \
+            --sarif --output semgrep.sarif
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: semgrep, path: semgrep.sarif }
+
+  dependencias:
+    name: 3 · Dependencias (npm audit)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: { proyecto: [BACKEND, FRONTEND] }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: npm audit (producción, umbral alto)
+        working-directory: ${{ matrix.proyecto }}
+        run: npm audit --omit=dev --audit-level=high
+
+  unitarias:
+    name: 4 · Pruebas unitarias
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: BACKEND/package-lock.json }
+      - working-directory: BACKEND
+        run: |
+          npm ci
+          mkdir -p coverage
+          npm run test:cobertura
+      - uses: actions/upload-artifact@v4
+        with: { name: cobertura, path: BACKEND/coverage/lcov.info }
+
+  calidad:
+    name: 5 · Calidad (SonarQube)
+    runs-on: ubuntu-latest
+    needs: [unitarias]
+    if: ${{ vars.SONAR_HOST_URL != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/download-artifact@v4
+        with: { name: cobertura, path: BACKEND/coverage }
+      - name: Análisis y puerta de calidad
+        run: |
+          docker run --rm -v "$PWD:/usr/src" sonarsource/sonar-scanner-cli:latest \
+            -Dsonar.host.url="${{ vars.SONAR_HOST_URL }}" -Dsonar.token="${{ secrets.SONAR_TOKEN }}" \
+            -Dsonar.qualitygate.wait=true
+        # La configuración del proyecto está en sonar-project.properties
+
+  imagenes:
+    name: 6 · Imágenes y configuración (Trivy)
+    runs-on: ubuntu-latest
+    needs: [secretos, sast, dependencias]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir imágenes
+        run: |
+          docker build -t atlas-atlas-backend ./BACKEND
+          docker build -t atlas-atlas-frontend --build-arg VITE_API_URL=/api ./FRONTEND
+      - name: Vulnerabilidades críticas y altas con corrección disponible
+        run: |
+          for img in atlas-atlas-backend atlas-atlas-frontend; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image \
+              --scanners vuln --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 "$img"
+          done
+      - name: Configuración de Dockerfile y compose
+        run: |
+          docker run --rm -v "$PWD:/src" aquasec/trivy:latest config --severity CRITICAL,HIGH --exit-code 1 /src
+
+  integracion:
+    name: 7 · Integración y seguridad dinámica
+    runs-on: ubuntu-latest
+    needs: [imagenes, unitarias]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Levantar Atlas (secretos y certificado efímeros del pipeline)
+        run: |
+          scripts/generar_env.sh
+          scripts/generar_certificados.sh
+          docker compose up -d --build
+          for i in $(seq 1 60); do curl -skf https://localhost:3443/api/ && break; sleep 2; done
+      - name: Suite de API (funcional y seguridad)
+        env:
+          API_URL: https://localhost:3443/api
+          FRONT_URL: https://localhost:3443
+          HTTP_FRONT_URL: http://localhost:3350
+          INSECURE_TLS: "1"
+          CICLO: ci
+          VERSION_SUT: ${{ github.sha }}
+          OUT_DIR: salida/api
+        run: python pruebas/api/atlas_seguridad.py
+      - name: Interfaz, accesibilidad y compatibilidad (Playwright + axe)
+        working-directory: pruebas
+        env:
+          API_URL: https://localhost:3443/api
+          FRONT_URL: https://localhost:3443
+          OUT_DIR: ../salida/e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium firefox webkit
+          node e2e/atlas_e2e.mjs
+      - name: OWASP ZAP baseline (falla con alertas de riesgo medio o alto)
+        run: |
+          mkdir -p salida/zap && chmod 777 salida/zap
+          docker run --rm --network host -v "$PWD/salida/zap:/zap/wrk:rw" zaproxy/zap-stable:latest \
+            zap-baseline.py -t https://localhost:3443 -r zap.html -J zap.json -l WARN
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: evidencias-integracion, path: salida/ }
+
+  puerta_humana:
+    name: 8 · Aprobación de QA
+    runs-on: ubuntu-latest
+    needs: [integracion]
+    if: github.ref == 'refs/heads/main'
+    # El ambiente "qa" exige la aprobación de un revisor en la configuración del repositorio.
+    environment: qa
+    steps:
+      - run: echo "Controles automatizados aprobados; QA autoriza el despliegue al ambiente de calidad."

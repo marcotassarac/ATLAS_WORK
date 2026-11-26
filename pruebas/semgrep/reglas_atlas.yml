@@ -1,0 +1,91 @@
+# Reglas Semgrep propias del proyecto Atlas (ISY1102 EV3).
+# Complementan las reglas de la comunidad (p/javascript, p/nodejs, p/owasp-top-ten...)
+# con los patrones inseguros encontrados en la revisión del código del Caso A.
+# Se ejecutan en cada ciclo y en el pipeline de CI: si un patrón vuelve a aparecer,
+# el análisis lo detecta (prueba de regresión estática).
+rules:
+  - id: atlas-secreto-por-defecto
+    languages: [javascript]
+    severity: ERROR
+    message: >-
+      Secreto con valor por defecto en el código ($X). Si falta la variable de entorno se usa
+      un valor conocido por cualquiera con acceso al repositorio. Leer el secreto solo desde el
+      entorno y fallar si no existe (ERS 2.4).
+    metadata: { cwe: "CWE-798", owasp: "A07:2021", defecto: "DEF-01" }
+    patterns:
+      - pattern: process.env.$X || "..."
+      - metavariable-regex:
+          metavariable: $X
+          regex: (?i).*(SECRET|PASSWORD|PASS|KEY|TOKEN|DATABASE_URL).*
+
+  - id: atlas-contrasena-texto-plano
+    languages: [javascript]
+    severity: ERROR
+    message: >-
+      Comparación directa de contraseñas. Indica que se guardan en texto plano; usar
+      bcrypt.compare() contra un hash (NFR-SEG-2).
+    metadata: { cwe: "CWE-256", owasp: "A02:2021", defecto: "DEF-03" }
+    paths:
+      include: ["BACKEND/**"] # en el frontend se compara "contraseña" con "confirmar contraseña"
+    pattern-either:
+      - pattern: $A.contrasena_hash !== $B
+      - pattern: $A.contrasena_hash === $B
+      - pattern: $A.contrasena_hash != $B
+      - pattern: $A.contrasena_hash == $B
+
+  - id: atlas-escritura-sin-control-de-rol
+    languages: [javascript]
+    severity: WARNING
+    message: >-
+      Ruta de escritura ($METODO) sin middleware de autorización. Agregar soloAdministrador
+      (o justificar con un comentario nosemgrep si el control se hace dentro del handler).
+    metadata: { cwe: "CWE-862", owasp: "A01:2021", defecto: "DEF-05" }
+    patterns:
+      - pattern: router.$METODO($RUTA, async (...) => {...})
+      - metavariable-regex:
+          metavariable: $METODO
+          regex: ^(post|put|patch|delete)$
+
+  - id: atlas-error-interno-expuesto
+    languages: [javascript]
+    severity: WARNING
+    message: >-
+      La respuesta incluye el mensaje interno del error (err.message). Revela tablas, columnas y
+      restricciones de la base. Responder un mensaje genérico y registrar el detalle en el log.
+    metadata: { cwe: "CWE-209", owasp: "A05:2021", defecto: "DEF-10" }
+    pattern-either:
+      - pattern: '$RES.status(...).json({..., glosa: $ERR.message || $ERR.toString(), ...})'
+      - pattern: '$RES.status(...).json({..., glosa: $ERR.message, ...})'
+
+  - id: atlas-cors-abierto
+    languages: [javascript]
+    severity: WARNING
+    message: CORS sin lista de orígenes permitidos (equivale a "*"). Configurar origin con una lista blanca.
+    metadata: { cwe: "CWE-942", owasp: "A05:2021", defecto: "DEF-16" }
+    pattern: app.use(cors())
+
+  - id: atlas-multer-sin-limites
+    languages: [javascript]
+    severity: WARNING
+    message: >-
+      multer sin límite de tamaño. Definir limits.fileSize (RF-5.2, 10 MB) para evitar el
+      agotamiento de memoria.
+    metadata: { cwe: "CWE-770", owasp: "A04:2021", defecto: "DEF-11" }
+    patterns:
+      - pattern: multer({...})
+      - pattern-not: 'multer({..., limits: $L, ...})'
+
+  - id: atlas-retardo-artificial
+    languages: [javascript]
+    severity: WARNING
+    message: Espera artificial en una ruta de la API. Degrada el tiempo de respuesta (NFR-PERF-1) sin aportar seguridad.
+    metadata: { defecto: "DEF-02" }
+    pattern: await delay($MS)
+
+  - id: atlas-log-datos-de-sesion
+    languages: [javascript]
+    severity: INFO
+    message: Se registran en el log datos de la sesión del usuario. Evitar volcar información del token (NFR-SEG-6).
+    metadata: { cwe: "CWE-532", owasp: "A09:2021", defecto: "DEF-10" }
+    pattern-either:
+      - pattern: console.log("authUser", ...)
