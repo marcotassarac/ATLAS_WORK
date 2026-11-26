@@ -21,8 +21,7 @@ npm install
    \c atlas
    \i sql/init.sql
    ```
-3. Conexión por defecto: `postgres://postgres:postgres@localhost:5432/atlas`
-   - Puedes cambiarla con `DATABASE_URL`.
+3. Definir `DATABASE_URL`, `JWT_SECRET` y `DATA_ENCRYPTION_KEY` (ver `.env.example`). No hay valores por defecto.
 
 ## Ejecutar
 ```bash
@@ -106,8 +105,8 @@ npm run start
 
 ## Notas
 - Los documentos de contratos se almacenan en DB (`documentos_contrato.document`) y se sirven desde `GET /contratos/:id/file`.
-- Contraseñas en texto plano a propósito (campo `contrasena_hash` no usa hash real).
-- Sin mitigaciones de seguridad (XSS/SQLi, etc.).
-- La mayoría de los endpoints requieren autenticación mediante token Bearer en el header `Authorization`.
+- Las contraseñas se guardan con bcrypt; el campo de entrada conserva el nombre `contrasena_hash` por compatibilidad.
+- Controles de seguridad de la v2.0: ver SECURITY.md en la raíz del repositorio.
+- Todos los endpoints, salvo el login y el registro, requieren autenticación mediante token Bearer en el header `Authorization`.
 - Los endpoints filtran datos por empresa según el `empresaId` contenido en el token JWT.
-- Todos los errores retornan formato: `{ error: "mensaje", glosa: "detalle del error" }`.
+- Los errores retornan `{ error, glosa }` con un mensaje para el usuario, sin detalles internos.

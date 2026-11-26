@@ -1,46 +1,67 @@
-# Bienvenido/a
+# Sistema de Gestión Atlas
 
-Este proyecto fue desarrollado para la asignatura ISY1102 - Calidad y seguridad en el desarrollo de software. En este repositorio se incluye un Frontend y Backend asociados al Caso A de la asignatura llamado "Sistema de Gestión Atlas".
+Proyecto de la asignatura ISY1102 - Seguridad y calidad en el desarrollo de software (Caso A).
+Atlas permite a pequeñas y medianas empresas gestionar clientes, contratos y documentos, administrar
+usuarios y roles, y auditar las acciones críticas, con especial atención a la usabilidad para adultos
+mayores y al cumplimiento de las leyes N.° 19.628 y N.° 21.719.
 
-Este software permitirá a usuarios registrados (por empresas) gestionar clientes, contratos y documentos asociados, administrar usuarios y roles internos de la empresa, auditar acciones, y garantizar cumplimiento de normativa de protección de datos y estándares de seguridad. Debe ser accesible desde desktop, tablets y móviles, con especial atención a la usabilidad para adultos mayores.
-
-Este proyecto está pensando para ser utilizado de las siguientes maneras:
- - Podrás inicializar el backend y frontend por separado y según tu lo requieras
- - Podrás efectuar análisis de código estático para frontend y backend.
- - Podrás efectuar análisis de código dinámico al levantar ambos servicios.
- - Utilizar docker en lugar de levantar manualmente cada servicio ya que se incluye una imagen para el proyecto completo que inicializa y configura cada elemento del software construido.
- 
+Esta rama contiene la **versión 2.0**, que corrige los 23 defectos detectados en el Ciclo 1 de pruebas
+(ver `CHANGELOG.md` y `SECURITY.md`). La versión original del docente está en la etiqueta `v1.0`.
 
 ## Estructura
 
-Abre el proyecto mediante terminal o editor de código de preferencia Visual Studio Code. El software tiene la siguiente estructura de carpetas y archivos
- 
 ```
-root
-	|/BACKEND
-	|/FRONTEND
-	|.env
-	|.gitignore
-	|docker-compose.yml
-	|package.json
-	|README.md
+BACKEND/            API REST (Node.js 22 + Express + PostgreSQL)
+  src/              código (middleware/, routes/, seguridad/)
+  sql/migraciones/  migraciones versionadas (se aplican en orden)
+  test/             pruebas unitarias (node:test)
+FRONTEND/           aplicación React (Vite) servida por nginx con TLS
+pruebas/            pruebas de seguridad y calidad (API, interfaz, carga, Semgrep)
+scripts/            generación de secretos y certificados
+.github/workflows/  pipeline de controles de seguridad automatizados
+docker-compose.yml  base, migraciones, API y frontend
 ```
-En el archivo `.env` se definen las variables de entorno que utilizará docker al momento de crear las imágenes, por lo que puedes modificarlas en el caso de tener otros servicios corriendo en tu equipo que utilicen los mismos puertos.
 
-1. JWT_SECRET: `0d1d8132f0fde5beabb417b434ff10f1cae8635a461686b0f46ac9c2bbfbd0e8` Llave utilizada para cifrar y generar los tokens de sesión
-2. PORT_POSTGRES: `15432` Puerto expuesto que utilizará tu equipo para permitir acceder a la conexión a la base de datos
-3. PORT_BACKEND: `4450` Puerto expuesto que utilizará tu equipo para acceder a la API
-4. PORT_FRONTEND: `3350` Puerto expuesto que utilizará tu equipo para acceder al cliente - frontend
+## Puesta en marcha con Docker
 
-## Inicialización con Docker
-Abre la terminal y situate en la raíz del proyecto y ejecuta el comando:
+1. Generar el archivo `.env` con secretos aleatorios (no se versiona):
+   ```bash
+   scripts/generar_env.sh
+   ```
+   Variables: `POSTGRES_PASSWORD`, `APP_DB_PASSWORD`, `JWT_SECRET` (32+ caracteres) y
+   `DATA_ENCRYPTION_KEY` (32 bytes en base64). Ver `.env.example`. Si falta alguna, los servicios no inician.
+2. Generar el certificado TLS del laboratorio (autofirmado; en producción, uno emitido por una autoridad):
+   ```bash
+   scripts/generar_certificados.sh
+   ```
+3. Levantar los servicios:
+   ```bash
+   docker compose up -d --build
+   ```
+4. Abrir **https://localhost:3443** (el puerto 3350 solo redirige a HTTPS). La API se publica en el mismo
+   origen, en `https://localhost:3443/api`. PostgreSQL escucha solo en `127.0.0.1:15432`.
 
-1. Ejecuta `docker-compose up -d` para levantar todos los servicios
-2. El frontend estará disponible en `http://localhost:3350` (o el puerto configurado en .env)
-3. El backend estará disponible en `http://localhost:4450` (o el puerto configurado en .env)
-4. La base de datos estará disponible para conectarse mediante:
-	4.1 Host: `localhost`
-	4.2 Port: `15432 `(o el configurado en .env)
-	4.3 Database: `atlas`
-	4.4 Nombre de usuario: `postgres`
-	4.5 Contraseña: `postgres`
+Credenciales del dump de ejemplo: `admin` (administrador) y `editor` (solo lectura). Son cuentas de
+laboratorio; en un ambiente real deben eliminarse o cambiarse antes del primer uso.
+
+## Pruebas
+
+```bash
+cd BACKEND && npm test                 # pruebas unitarias de los controles de seguridad
+bash pruebas/ejecutar_ciclo.sh 2 v2.0 salida/ciclo2   # ciclo completo (requiere la aplicación levantada)
+```
+
+El ciclo completo ejecuta npm audit, Semgrep (reglas de la comunidad y reglas propias), Gitleaks, Trivy,
+la suite de API (`pruebas/api/atlas_seguridad.py`), Playwright con axe-core, Lighthouse, k6 y OWASP ZAP.
+Para la versión con HTTPS:
+
+```bash
+API_URL=https://localhost:3443/api FRONT_URL=https://localhost:3443 HTTP_FRONT_URL=http://localhost:3350 \
+INSECURE_TLS=1 API_URL_DOCKER=https://host.docker.internal:3443/api FRONT_URL_DOCKER=https://host.docker.internal:3443 \
+OPENAPI_ARCHIVO=BACKEND/src/openapi.json bash pruebas/ejecutar_ciclo.sh 2 v2.0 salida/ciclo2
+```
+
+## Seguridad
+
+Ver `SECURITY.md` para los controles implementados, la configuración segura y cómo reportar
+vulnerabilidades.
