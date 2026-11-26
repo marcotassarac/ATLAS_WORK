@@ -68,7 +68,8 @@ export default function Layout() {
       </Box>
 
       {/* Listado de accesos */}
-      <List sx={{ flex: 1, py: 2 }}>
+      {/* DEF-21: menú como <nav> (antes <ul> con enlaces sin <li>, regla "list" de WCAG) */}
+      <List component="nav" aria-label="Menú principal" sx={{ flex: 1, py: 2 }}>
         {[...menuItems, ...(role === "administrador" ? adminItems : [])].map(
           (item) => {
             const active = location.pathname.startsWith(item.to);
@@ -76,6 +77,7 @@ export default function Layout() {
               <ListItemButton
                 key={item.to}
                 selected={active}
+                aria-current={active ? "page" : undefined}
                 component={Link}
                 to={item.to}
                 data-testid={`link-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
