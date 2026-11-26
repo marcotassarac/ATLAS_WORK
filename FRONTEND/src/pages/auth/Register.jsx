@@ -204,7 +204,7 @@ export default function Register() {
               <button
                 type="submit"
                 data-testid="button-registro-continuar"
-                className="w-full mt-4 py-3 text-lg font-semibold bg-secondary text-primary rounded-lg hover:bg-[#e6a600] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+                className="w-full mt-4 py-3 text-lg font-semibold bg-secondary text-white rounded-lg hover:bg-primary hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
               >
                 Continuar
               </button>

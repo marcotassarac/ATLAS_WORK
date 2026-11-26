@@ -262,7 +262,7 @@ export default function EmpresasList() {
                       </TableCell>
                       {role === 'administrador' && (
                         <TableCell align="right">
-                          <IconButton 
+                          <IconButton aria-label="Editar empresa"
                             color="primary" 
                             onClick={() => navigate(`/empresas/${e.id}/editar`)}
                             sx={{

@@ -51,13 +51,13 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-row items-center justify-cente relative overflow-hidden p-0">
+    <div className="min-h-screen w-full flex flex-col md:flex-row items-center justify-center relative overflow-hidden p-0">
       <div
         className="fixed inset-0 w-full h-full bg-cover bg-center bg-no-repeat -z-10"
         style={{ backgroundImage: `url(${bgRegistro})` }}
       ></div>
 
-      <div className="w-6/12 min-h-screen relative z-10 bg-white flex items-center justify-center shadow-lg">
+      <div className="w-full md:w-6/12 min-h-screen relative z-10 bg-white flex items-center justify-center shadow-lg">
         <div className="p-8 w-full max-w-md">
           <Box
             sx={{

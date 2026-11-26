@@ -3,7 +3,7 @@ import { createTheme } from "@mui/material";
 const theme = createTheme({
   palette: {
     primary: { main: "#1B7576" }, // Verde azulado
-    secondary: { main: "#4BBC7F" }, // Verde claro
+    secondary: { main: "#237A4B" }, // DEF-21: verde con contraste 5,3:1 sobre blanco
     background: { default:"#fffff", paper: "#ffffff" }, // slate-50
   },
   typography: {

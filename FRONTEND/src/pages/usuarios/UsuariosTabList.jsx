@@ -111,6 +111,7 @@ export default function UsuariosTabList({ items, onDelete }) {
                 <IconButton
                   color="primary"
                   size="small"
+                  aria-label="Editar usuario"
                   data-testid={`button-usuario-editar-${row.original.id}`}
                   onClick={() =>
                     navigate(`/usuarios/${row.original.id}/editar`)
@@ -126,6 +127,7 @@ export default function UsuariosTabList({ items, onDelete }) {
                 <IconButton
                   color="error"
                   size="small"
+                  aria-label="Eliminar usuario"
                   data-testid={`button-usuario-eliminar-${row.original.id}`}
                   onClick={() =>
                     handleDeleteClick(

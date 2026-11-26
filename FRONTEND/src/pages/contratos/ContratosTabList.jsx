@@ -202,6 +202,7 @@ export default function ContratosTabList({
                 <IconButton
                   color="primary"
                   size="small"
+                  aria-label="Editar contrato"
                   data-testid={`button-contrato-editar-${row.original.id}`}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -218,6 +219,7 @@ export default function ContratosTabList({
                 <IconButton
                   color="error"
                   size="small"
+                  aria-label="Eliminar contrato"
                   data-testid={`button-contrato-eliminar-${row.original.id}`}
                   onClick={(e) => {
                     e.stopPropagation();

@@ -5,13 +5,13 @@ export default {
     extend: {
       colors: {
         primary: "#1B7576",
-        secondary: "#4BBC7F",
+        secondary: "#237A4B", // DEF-21: 5,3:1 con texto blanco (antes #4BBC7F, 2,4:1)
       },
       fontFamily: {
         sans: ["Poppins", "Arial", "sans-serif"],
       },
       fontSize: {
-        base: "13px" /* Reducido de 14px (default) a 12px (2pt menos) */,
+        base: "16px" /* DEF-21: NFR-USAB-1, texto legible para adultos mayores (antes 13px) */,
       },
     },
   },
