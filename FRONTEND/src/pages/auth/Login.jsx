@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
-import bgRegistro from "../../assets/bg-registro.jpg";
+import bgRegistro from "../../assets/bg-registro.webp"; // DEF-22
 import { toast } from "sonner";
 import Logo from "../../assets/logo.svg";
 import LogoDuoc from "../../assets/logo-duoc.svg";

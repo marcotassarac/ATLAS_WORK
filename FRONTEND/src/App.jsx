@@ -1,20 +1,25 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
-import Layout from "./components/Layout";
-import UsuariosList from "./pages/usuarios/UsuariosList";
-import UsuarioForm from "./pages/usuarios/UsuarioForm";
-import EmpresaForm from "./pages/empresas/EmpresaForm";
 import { RequireAuth, RequireAdmin, RequireAdminOPropio } from "./components/RoleGuard";
 import Login from "./pages/auth/Login";
-import Register from "./pages/auth/Register";
-import ClientesList from "./pages/clientes/ClientesList";
-import ClienteForm from "./pages/clientes/ClienteForm";
-import ContratosList from "./pages/contratos/ContratosList";
-import ContratoForm from "./pages/contratos/ContratoForm";
-import ContratoDetalle from "./pages/contratos/ContratoDetalle";
-import AuditoriaList from "./pages/auditoria/AuditoriaList";
-import Home from "./pages/Home";
-import Privacidad from "./pages/legal/Privacidad";
+
+// DEF-22 (NFR-PERF-2): cada pantalla se descarga cuando se visita; el login carga
+// solo su propio código en lugar de todo el sistema.
+const UsuariosList = lazy(() => import("./pages/usuarios/UsuariosList"));
+const UsuarioForm = lazy(() => import("./pages/usuarios/UsuarioForm"));
+const EmpresaForm = lazy(() => import("./pages/empresas/EmpresaForm"));
+const Register = lazy(() => import("./pages/auth/Register"));
+const ClientesList = lazy(() => import("./pages/clientes/ClientesList"));
+const ClienteForm = lazy(() => import("./pages/clientes/ClienteForm"));
+const ContratosList = lazy(() => import("./pages/contratos/ContratosList"));
+const ContratoForm = lazy(() => import("./pages/contratos/ContratoForm"));
+const ContratoDetalle = lazy(() => import("./pages/contratos/ContratoDetalle"));
+const AuditoriaList = lazy(() => import("./pages/auditoria/AuditoriaList"));
+const Home = lazy(() => import("./pages/Home"));
+const Privacidad = lazy(() => import("./pages/legal/Privacidad"));
+
+const Layout = lazy(() => import("./components/Layout"));
 
 export default function App() {
   return (
@@ -24,6 +29,7 @@ export default function App() {
         richColors 
         closeButton 
       />
+      <Suspense fallback={<div role="status" style={{ padding: 24 }}>Cargando…</div>}>
       <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/registro" element={<Register />} />
@@ -65,6 +71,7 @@ export default function App() {
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
+      </Suspense>
     </>
   );
 }

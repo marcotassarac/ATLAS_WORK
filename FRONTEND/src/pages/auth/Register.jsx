@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { api } from "../../lib/api.jsx";
 import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
-import bgRegistro from "../../assets/bg-registro.jpg";
+import bgRegistro from "../../assets/bg-registro.webp"; // DEF-22
 
 export default function Register() {
   const [step, setStep] = useState(1);
